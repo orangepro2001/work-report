@@ -24,8 +24,9 @@ Two Quadlet units, both on this host:
 | `work-report` | `work-report` (this image) | `0.0.0.0:3560` |
 
 The database runs **locally** since 2026-11-05. It used to live on the AI host over
-the tailnet; the move cut a board request from 0.45 s to 0.09 s, because every query
-had been crossing a relayed, lossy path (docs/perf.md).
+the tailnet; the move cut a board request from 0.45 s to 0.09 s. The tailnet path was
+direct (not relayed) but cost ~250 ms per query round trip with occasional
+multi-second stalls — measured, see docs/perf.md.
 
 Port **3560**, not 3500: `daily-work-web` already owns 3500/`/report` on another
 host, and 3560 keeps this service unambiguous in `ss -ltn` output.

@@ -91,22 +91,32 @@ it is handed. The detail block was styled cell by cell (61 rows × 13 columns, ~
 
 Sheet writing: **965 ms → 225 ms**. Full export: **1.05 s → 0.36 s** of work.
 
-## Known bottleneck: packet loss on the tailnet path (resolved)
+## Why the tailnet database had to go (measured, 2026-11-05)
 
-`ping 100.101.146.117` from the application host reports **~35 % packet loss** with
-6–8 ms RTT, and `tailscale netcheck` shows the path is being relayed through the
-Tokyo DERP rather than a direct connection. Every extra round trip therefore costs
-far more than its nominal latency, which is why a page with five queries takes
-0.45 s rather than 0.05 s.
+The first explanation written here was wrong, and the correction matters:
 
-This was a network property, not application time: a single `psql` round trip from
-the same host measured 5–9 ms once established, but a page needs five of them.
+- `tailscale ping` reported **direct** connectivity,
+  `CurAddr: 221.153.52.66:41641`, 45 ms — `Relay: tok` is only the configured
+  fallback DERP, not the path in use.
+- Plain ICMP from this host showed 35–70 % loss with a 6.5 ms RTT. That number is
+  misleading: ICMP is deprioritised on that path and says nothing about the data
+  plane.
+- What actually happens on the data plane, measured with a single psql connection
+  to the AI host: **220 ms, 282 ms, then a 14.3 s stall** on consecutive trivial
+  `select 1` statements.
 
-**Resolved by taking option 2**: the cluster now runs on this host as the
-`work-report-db` Quadlet unit and the application connects over the loopback. No
-code changed — `DB_HOST`/`DB_PORT`/`DB_SSLMODE` in `~/.config/work-report/env`, and
-the board went from 0.45 s to 0.09 s. The remote instance still holds a copy as a
-rollback point (docs/deploy.md).
+So the problem was never "relay vs direct" and not ICMP loss — it was ~250 ms per
+round trip with multi-second stalls, applied to five or six queries per page. That is
+why the board sat at 0.45 s.
+
+Resolution: the cluster moved onto this host (`work-report-db`, 127.0.0.1:5433). No
+code changed, only `DB_HOST`/`DB_PORT`/`DB_SSLMODE`. A query round trip went from
+~250 ms to well under a millisecond, and the board from 0.45 s to 0.09 s. The remote
+instance still holds a copy as a rollback point (docs/deploy.md).
+
+If the two hosts are ever reunited, re-measure before choosing the remote one: a
+query-per-request application needs a round trip in the low single-digit
+milliseconds, and a consumer tailnet link does not reliably provide that.
 
 ## Export cost
 
