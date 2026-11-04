@@ -43,6 +43,32 @@ prefix, but nginx also rewrites `/report/...` for direct access (`location ~*
 ^/report/(assets/.+)$` plus Laravel's own `WR_BASE_PATH` routing). This is verified
 by requesting both forms.
 
+## Public entry point: 521985.xyz/report
+
+The tailnet URL is not the only door. The rootful Caddy on this host
+(`/etc/daily-work-web/Caddyfile`, container `daily-work-web-caddy`, public
+210.207.108.170 → NIC 172.22.0.29) terminates TLS for `521985.xyz` and exposes
+`/report` next to `/sso` and `/teach`:
+
+```caddy
+import prefix report 127.0.0.1:3560
+```
+
+`(prefix)` strips the prefix before forwarding — the same contract `tailscale serve
+--set-path /report` uses, and the reason one build serves both doors: the app emits
+`/report/...` URLs (`WR_BASE_PATH=/report`) and never receives the prefix itself.
+A direct request to the container with the prefix left on (`127.0.0.1:3560/report/board`)
+is a 404, so any new proxy in front of it must strip too.
+
+Two things to know:
+
+- **The board is world-readable there.** There is no login (docs/auth-seam.md), so
+  anyone who guesses `/report` can read and edit it. That is a decision, not an
+  oversight; adding Basic auth to the vhost is a two-line change.
+- The vhost is **not in this repository**, so nothing in CI can catch a regression.
+  The `nginx` vhost of the same name (`/etc/nginx/sites-available/egg-521985.xyz.conf`)
+  is dead: nginx is inactive and its `127.0.0.1:3000` upstream no longer exists.
+
 ## Database
 
 PostgreSQL 18 runs on this host as the `work-report-db` Quadlet unit, published on
