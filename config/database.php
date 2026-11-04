@@ -97,6 +97,14 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // The PostgreSQL instance is on the tailnet: one TCP+TLS handshake
+            // costs ~110 ms, which used to dominate a six-query page. php-fpm
+            // workers are long lived, so a persistent connection removes that cost
+            // from every request after the first. PDO options must be keyed by
+            // their constant, not by a string name.
+            'options' => array_filter([
+                PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+            ], fn ($v) => $v !== null),
         ],
 
         'sqlsrv' => [

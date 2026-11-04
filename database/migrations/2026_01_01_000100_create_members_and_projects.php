@@ -44,6 +44,11 @@ return new class extends Migration
             $table->string('description', 500)->nullable();
             $table->unsignedSmallInteger('position')->default(0);
             $table->boolean('archived')->default(false);
+            // Issue numbering: the next number to hand out and the highest ever
+            // handed out. A counter on the project row is the cheapest correct
+            // allocation (one locked row) and keeps keys stable across deletions.
+            $table->unsignedInteger('next_issue_no')->default(1);
+            $table->unsignedInteger('issue_high_water')->default(0);
             $table->timestamps();
 
             $table->unique('abbr');

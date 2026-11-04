@@ -39,11 +39,16 @@ class BoardController extends Controller
         $projects = Project::visible()->get(['id', 'name', 'abbr', 'color', 'position']);
         $members = Member::active()->get(['id', 'name', 'color', 'position']);
 
+        // Reporter is only rendered in the list lens, so the board and backlog skip
+        // that join: one fewer round trip over the tailnet (docs/perf.md).
+        $relations = $lens === 'list'
+            ? ['project:id,abbr,name,color', 'assignee:id,name,color', 'coAssignees:id,name,color', 'reporter:id,name']
+            : ['project:id,abbr,name,color', 'assignee:id,name,color', 'coAssignees:id,name,color'];
+
         $query = Issue::query()
-            ->forBoard()
-            ->with(['reporter:id,name', 'sprint:id,name,state'])
-            // Deterministic board order; the index (project_id, status_key, board_rank)
-            // covers this exactly.
+            ->with($relations)
+            // Matches issues_board_order_idx (status_key, board_rank).
+            ->orderBy('status_key')
             ->orderBy('board_rank')
             ->orderBy('id');
 

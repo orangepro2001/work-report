@@ -22,6 +22,10 @@ fi
 log "discovering packages"
 php artisan package:discover --ansi >/dev/null
 
+# pg_trgm backs the JQL-lite search indexes; creating it is idempotent. The role may
+# lack the privilege on a managed cluster, hence the "|| true".
+php artisan db:statement "CREATE EXTENSION IF NOT EXISTS pg_trgm" >/dev/null 2>&1 || true
+
 log "running migrations"
 php artisan migrate --force --no-interaction
 
