@@ -19,7 +19,15 @@ final class RequireActor
     public function handle(Request $request, Closure $next): Response
     {
         if (app(ActorResolver::class)->current() === null) {
-            $request->session()->put('url.intended', $request->fullUrl());
+            // Built through the URL generator on purpose: the reverse proxy strips the
+            // /report mount prefix before PHP runs, so $request->fullUrl() would send
+            // the person to /board — the *portal's* path — after signing in. url()
+            // puts the prefix back (ForceMountPath, docs/deploy.md).
+            $query = $request->getQueryString();
+            $request->session()->put(
+                'url.intended',
+                url($request->path()).($query !== null && $query !== '' ? '?'.$query : ''),
+            );
 
             return redirect()->route('sso.redirect');
         }

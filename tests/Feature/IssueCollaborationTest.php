@@ -207,6 +207,38 @@ class IssueCollaborationTest extends TestCase
         $this->assertSame(4, Member::count());
     }
 
+    /**
+     * The mount prefix has to survive the round trip. The proxy strips /report before
+     * PHP runs, so remembering the request as-is sent people to https://host/board —
+     * the portal's 404 — instead of https://host/report/board after signing in.
+     */
+    public function test_the_intended_url_keeps_the_mount_prefix(): void
+    {
+        config([
+            'workreport.sso.issuer' => 'https://sso.test/sso',
+            'workreport.sso.internal_base' => 'http://127.0.0.1:3550',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        $this->flushSession();
+
+        $this->get('/list?status=done')->assertRedirect(route('sso.redirect'));
+
+        $this->assertSame(url('/list?status=done'), session('url.intended'));
+
+        // …and the callback sends the browser exactly there.
+        Http::fake([
+            'http://127.0.0.1:3550/oauth/token' => Http::response(['access_token' => 'tok']),
+            'http://127.0.0.1:3550/oauth/userinfo' => Http::response([
+                'sub' => 'sub-1', 'name' => '이성민', 'preferred_username' => 'lee-sungmin',
+            ]),
+        ]);
+
+        $this->withSession(['oidc.state' => 'st'])
+            ->get('/auth/sso/callback?state=st&code=abc')
+            ->assertRedirect(url('/list?status=done'));
+    }
+
     public function test_an_unreachable_sso_is_reported_instead_of_a_500(): void
     {
         config([
