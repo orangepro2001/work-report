@@ -18,6 +18,12 @@ several people can work in at the same time.
  (칸반 · 목록)      (양식 그대로)      (rev02 서식 1:1)
 ```
 
+| 보드 | 일보 |
+|---|---|
+| ![board](docs/img/board.png) | ![daily](docs/img/daily.png) |
+
+**Production**: <https://egg.tail9f7f1f.ts.net/report> (tailnet only)
+
 ## Quick start
 
 ```sh
@@ -28,7 +34,8 @@ php artisan migrate --seed
 php artisan serve
 ```
 
-Open <http://127.0.0.1:8000/report/board>.
+Open <http://127.0.0.1:8000/board> (locally the mount prefix is empty; with
+`WR_BASE_PATH=/report` every generated URL carries it).
 
 No PHP on the host? Run everything in the dev image:
 
@@ -94,6 +101,20 @@ composer test            # phpunit, PostgreSQL (jsonb is real)
 composer lint            # pint --test
 composer fix             # pint
 python3 tools/inspect_xlsx.py docs/source-rev02.xlsx   # re-extract the spec
+```
+
+Tests need a PostgreSQL. Point them at a **local** instance, not the production one
+on the tailnet: the suite creates and drops its schema, and packet loss on a remote
+link turns 18 seconds into several minutes.
+
+```sh
+podman run -d --name wr-pg-test -p 127.0.0.1:5442:5432 \
+  -e POSTGRES_DB=work_report_test -e POSTGRES_USER=work_report -e POSTGRES_PASSWORD=secret \
+  docker.io/library/postgres:18-alpine
+podman exec wr-pg-test psql -U work_report -d work_report_test \
+  -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+
+DB_HOST=127.0.0.1 DB_PORT=5442 DB_PASSWORD=secret DB_SSLMODE=prefer composer test
 ```
 
 The test suite asserts the exporter against `docs/source-rev02.xlsx` itself:

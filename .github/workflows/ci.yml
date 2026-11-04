@@ -30,6 +30,13 @@ jobs:
 
       - run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Create the trigram extension the search indexes need
+        env:
+          PGPASSWORD: secret
+        run: |
+          psql -h 127.0.0.1 -U work_report -d work_report_test \
+            -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+
       - name: Prepare environment
         run: |
           cp .env.example .env
