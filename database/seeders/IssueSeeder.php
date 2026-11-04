@@ -74,6 +74,16 @@ class IssueSeeder extends Seeder
                         ->all()
                 );
             }
+
+            // Reserve the numbers the seed used, so the next manual issue continues
+            // after them instead of colliding with a seeded key.
+            foreach ($projects as $project) {
+                $max = Issue::where('project_id', $project->getKey())->max('issue_no') ?? 0;
+                $project->forceFill([
+                    'issue_high_water' => (int) $max,
+                    'next_issue_no' => (int) $max + 1,
+                ])->save();
+            }
         });
     }
 }

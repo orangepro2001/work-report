@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: work_report_test
+          POSTGRES_USER: work_report
+          POSTGRES_PASSWORD: secret
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U work_report"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, gd, zip, intl, bcmath, mbstring
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=secret/' .env
+          sed -i 's/^DB_SSLMODE=.*/DB_SSLMODE=prefer/' .env
+
+      - name: Code style
+        run: ./vendor/bin/pint --test
+
+      - name: Tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: work_report_test
+          DB_USERNAME: work_report
+          DB_PASSWORD: secret
+          DB_SSLMODE: prefer
+        run: php artisan test
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the runtime image
+        run: podman build --format docker -f deploy/Containerfile -t work-report:ci .
+      - name: Verify the extensions the exporter needs
+        run: |
+          podman run --rm --entrypoint sh work-report:ci \
+            -c 'php -m | grep -E "pdo_pgsql|gd|zip|intl|mbstring"'

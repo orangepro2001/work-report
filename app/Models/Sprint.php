@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\SprintFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sprint extends Model
 {
-    /** @use HasFactory<\Database\Factories\SprintFactory> */
+    /** @use HasFactory<SprintFactory> */
     use HasFactory;
 
     protected $fillable = ['project_id', 'name', 'goal', 'state', 'starts_on', 'ends_on', 'position'];
@@ -23,7 +25,7 @@ class Sprint extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function issues(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function issues(): HasMany
     {
         return $this->hasMany(Issue::class);
     }

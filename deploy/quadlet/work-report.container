@@ -1,0 +1,54 @@
+# Quadlet unit for work-report (docs/deploy.md).
+# Installed by deploy/scripts/install.sh into ~/.config/containers/systemd/.
+# Generates work-report.service; run it with `systemctl --user ...`.
+#
+# The service listens on all interfaces (0.0.0.0:3560) as required, so it is
+# reachable both directly on the tailnet and through `tailscale serve --set-path
+# /report http://127.0.0.1:3560`.
+
+[Unit]
+Description=work-report — 업무일보 (Jira-style report with Excel export)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/work-report:current
+ContainerName=work-report
+# Host networking so the bind address is the host's, not a slirp/pasta NAT.
+Network=host
+Environment=WR_LISTEN=0.0.0.0:3560
+Environment=APP_ENV=production
+Environment=APP_DEBUG=false
+Environment=LOG_CHANNEL=stderr
+Environment=WR_BASE_PATH=/report
+Environment=WR_TZ=Asia/Seoul
+EnvironmentFile=%h/.config/work-report/env
+
+# The rootfs is read-only: Laravel writes compiled views/config and sessions into
+# tmpfs, and nothing else may be written inside the container.
+ReadOnly=true
+Tmpfs=/tmp
+Tmpfs=/app/storage/framework/views:size=64m,mode=0777
+Tmpfs=/app/storage/framework/cache:size=32m,mode=0777
+Tmpfs=/app/storage/framework/sessions:size=16m,mode=0777
+Tmpfs=/app/storage/logs:size=32m,mode=0777
+Tmpfs=/app/bootstrap/cache:size=16m,mode=0777
+
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=["/usr/bin/curl","-fsS","http://127.0.0.1:3560/healthz"]
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+HealthOnFailure=kill
+LogDriver=journald
+AutoUpdate=local
+
+[Service]
+Restart=always
+RestartSec=3
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

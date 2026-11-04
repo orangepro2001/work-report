@@ -1,58 +1,123 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 업무일보 — work-report
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Jira-shaped collaborative work tracker that exports **the team's existing Excel
+daily report, cell for cell**. The workbook everyone already uses stays the output
+format; the input becomes a board, a list, a backlog and an issue drawer that
+several people can work in at the same time.
 
-## About Laravel
+- **Korean by default.** The UI copy is written the way the team speaks, not
+  translated from English. `en` and `ja` are available.
+- **The spreadsheet is a contract, not an export.** Column widths, merged ranges,
+  hairline borders, number formats, conditional formatting, dropdown validations
+  and the summary formulas are all reproduced and asserted by
+  `tests/Feature/ExcelExportGoldenTest.php`.
+- **Laravel 13 + PostgreSQL 18 + PhpSpreadsheet 5**, one container, no build step.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+업무일보 보드   →  일보 그리드  →  업무일보_YYYYMMDD.xlsx
+ (칸반 · 목록)      (양식 그대로)      (rev02 서식 1:1)
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Quick start
 
-## Contributing
+```sh
+cp .env.example .env
+php artisan key:generate
+# fill in DB_* (PostgreSQL), then:
+php artisan migrate --seed
+php artisan serve
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Open <http://127.0.0.1:8000/report/board>.
 
-## Code of Conduct
+No PHP on the host? Run everything in the dev image:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```sh
+podman build -f deploy/Containerfile -t localhost/work-report:current .
+deploy/scripts/install.sh
+```
 
-## Security Vulnerabilities
+Full deployment (Podman + Quadlet + `tailscale serve /report`) is in
+[docs/deploy.md](docs/deploy.md).
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## What is in the box
+
+| Surface | Route | Purpose |
+|---|---|---|
+| Board | `/report/board` | Kanban with drag & drop across 예정 / 진행 중 / 완료 / 보류 |
+| List | `/report/list` | The workbook's columns as a dense sortable table |
+| Backlog | `/report/backlog` | Everything grouped by 구분 |
+| Issue drawer | `/report/issues/{id}` | Inline edit, comments, `@mentions`, activity timeline |
+| 일보 | `/report/daily` | The printed sheet, generated from live data |
+| Export | `/report/export.xlsx` | The real thing: rev02 layout, `업무일보_YYYYMMDD.xlsx` |
+
+Keyboard: `c` new issue · `/` search · `g b` board · `g l` list · `g d` daily · `Esc` close.
+
+## Architecture
+
+```
+app/
+  Contracts/ActorResolver.php        ← the only seam for identity (SSO-ready)
+  Services/SessionActorResolver.php  ← current implementation: member switcher
+  Services/IssueKeyGenerator.php     ← atomic per-project numbering (3D-01)
+  Services/Excel/
+    ReportSheetWriter.php            ← sheet 업무일보, every colour and formula
+    WorkbookWriter.php               ← three sheets, defined names, order
+    ReportExporter.php               ← filters → workbook + filename
+    XlsxPackager.php                 ← post-write XML repairs (see below)
+  Http/Controllers/                  ← Board, Issue, DailyReport, Export
+resources/views/                     ← Blade + Alpine, hand-written CSS
+lang/ko/{ui,activity}.php            ← Korean is the source language
+docs/excel-schema.md                 ← the golden spec, extracted from the file
+tools/inspect_xlsx.py                ← regenerates that spec from any workbook
+```
+
+### Two details worth knowing
+
+**`XlsxPackager` exists for a reason.** PhpSpreadsheet writes `_xlfn.AVERAGEIFS`
+(the function-name prefix Excel uses for post-2007 functions), but the reference
+workbook contains plain `AVERAGEIFS` — and LibreOffice rejects the prefixed form.
+It also writes only `fgColor` for solid fills, which renders black in readers that
+honour `bgColor`. Both are repaired by rewriting the produced archive, so
+everything else stays exactly as the writer emitted it.
+
+**Issue keys are allocated, never derived.** The workbook computes `업무 키` with
+`=COUNTIFS($D$16:$D16,$D16,$E$16:$E16,"<>")`, which renumbers when a row is
+inserted. People quote keys in comments, so the number is reserved once inside the
+insert transaction (`IssueKeyGenerator`) and kept in a project counter that survives
+deletions.
+
+## Development
+
+```sh
+composer test            # phpunit, PostgreSQL (jsonb is real)
+composer lint            # pint --test
+composer fix             # pint
+python3 tools/inspect_xlsx.py docs/source-rev02.xlsx   # re-extract the spec
+```
+
+The test suite asserts the exporter against `docs/source-rev02.xlsx` itself:
+sheet order, column widths, merged ranges, every written cell, the hidden
+`집계용 진행률` helper column, the six dropdown ranges, the conditional-format
+blocks and the print setup.
+
+## Identity and SSO
+
+There is no login yet, by design. `App\Contracts\ActorResolver` is the single
+place that decides who is acting; today `SessionActorResolver` reads a session
+value set by the member switcher in the top bar. When the separate SSO/OIDC
+application is ready, bind a different implementation in `AppServiceProvider` —
+controllers, views, policies and the schema stay untouched. See
+[docs/auth-seam.md](docs/auth-seam.md).
+
+## Docs
+
+- [docs/excel-schema.md](docs/excel-schema.md) — the workbook, extracted and specified
+- [docs/architecture.md](docs/architecture.md) — how the pieces fit
+- [docs/deploy.md](docs/deploy.md) — Podman, Quadlet, `/report` reverse proxy
+- [docs/auth-seam.md](docs/auth-seam.md) — the OIDC integration point
+- [docs/ui.md](docs/ui.md) — interaction model and design tokens
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT

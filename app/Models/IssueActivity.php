@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\IssueActivityFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IssueActivity extends Model
 {
-    /** @use HasFactory<\Database\Factories\IssueActivityFactory> */
+    /** @use HasFactory<IssueActivityFactory> */
     use HasFactory;
 
     protected $fillable = ['issue_id', 'actor_id', 'verb', 'changes'];

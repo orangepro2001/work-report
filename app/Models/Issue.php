@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\IssueFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Issue extends Model
 {
-    /** @use HasFactory<\Database\Factories\IssueFactory> */
+    /** @use HasFactory<IssueFactory> */
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
@@ -42,7 +43,7 @@ class Issue extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /* Relations                                                          */
+    /* Relations */
     /* ------------------------------------------------------------------ */
 
     public function project(): BelongsTo
@@ -95,7 +96,7 @@ class Issue extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /* Derived attributes                                                 */
+    /* Derived attributes */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -157,7 +158,7 @@ class Issue extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /* Scopes                                                             */
+    /* Scopes */
     /* ------------------------------------------------------------------ */
 
     /** Everything the board needs, in two queries plus the co-assignee pivot. */

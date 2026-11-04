@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\IssueCommentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class IssueComment extends Model
 {
-    /** @use HasFactory<\Database\Factories\IssueCommentFactory> */
+    /** @use HasFactory<IssueCommentFactory> */
     use HasFactory, SoftDeletes;
 
     protected $fillable = ['issue_id', 'author_id', 'body'];

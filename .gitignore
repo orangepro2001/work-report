@@ -20,3 +20,4 @@
 .vscode
 *.log
 /.cache
+/gen.php

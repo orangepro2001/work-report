@@ -12,22 +12,38 @@ use Illuminate\Support\Facades\DB;
  * (`=COUNTIFS($D$16:$D16,$D16,$E$16:$E16,"<>")`), which renumbers whenever a row
  * is inserted. A real tracker cannot do that — other people quote the key in
  * comments — so the number is allocated once, atomically, inside the same
- * transaction that inserts the issue:
+ * transaction that inserts the issue.
  *
- *   SELECT max(issue_no) FROM issues WHERE project_id = ? FOR UPDATE
- *
- * A partial unique index (project_id, issue_no) makes a collision impossible even
- * if two requests race past the lock.
+ * PostgreSQL cannot combine an aggregate with FOR UPDATE ("FOR UPDATE is not
+ * allowed with aggregate functions"), and locking every row of a project just to
+ * learn its maximum would serialise unrelated inserts anyway. The counter is
+ * therefore kept in a dedicated row: the project row itself is locked
+ * (SELECT … FOR UPDATE), its `next_issue_no` column is incremented, and the
+ * transaction that reserved the number is the one that inserts the issue. The
+ * unique index (project_id, issue_no) remains the last line of defence.
  */
 class IssueKeyGenerator
 {
     public function nextFor(Project $project): int
     {
-        $max = DB::table('issues')
-            ->where('project_id', $project->getKey())
+        $locked = DB::table('projects')
+            ->where('id', $project->getKey())
             ->lockForUpdate()
-            ->max('issue_no');
+            ->first(['id', 'next_issue_no', 'issue_high_water']);
 
-        return ((int) $max) + 1;
+        if ($locked === null) {
+            throw new \RuntimeException("Project {$project->getKey()} does not exist.");
+        }
+
+        // The high-water mark survives deletions, which is what makes the key
+        // stable: deleting 3D-02 must not let the next issue become 3D-02 again.
+        $next = max((int) $locked->next_issue_no, (int) $locked->issue_high_water + 1, 1);
+
+        DB::table('projects')->where('id', $locked->id)->update([
+            'next_issue_no' => $next + 1,
+            'issue_high_water' => $next,
+        ]);
+
+        return $next;
     }
 }

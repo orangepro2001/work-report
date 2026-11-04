@@ -13,20 +13,16 @@ ARG PHP_VERSION=8.4
 ###############################################################################
 FROM docker.io/library/composer:2 AS vendor
 
-USER root
-RUN apk add --no-cache --virtual .build $PHPIZE_DEPS libzip-dev libpng-dev freetype-dev libjpeg-turbo-dev \
-    && apk add --no-cache libzip libpng freetype libjpeg-turbo postgresql-libs icu-libs \
-    && apk add --no-cache --virtual .run libpq icu-dev oniguruma-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" zip gd pdo_pgsql intl bcmath opcache \
-    && apk del .build .run \
-    && rm -rf /var/cache/apk/*
-
+# Composer only resolves and downloads files here; no PHP extension is required, so
+# this stage stays a single layer and never touches apt/apk.
 WORKDIR /app
 # Resolution first so the layer is reused until the lock file actually changes.
 COPY composer.json composer.lock ./
+# --ignore-platform-reqs only for *this* stage: the runtime image below compiles
+# every extension PhpSpreadsheet and Laravel actually need (gd, zip, pdo_pgsql,
+# intl, mbstring). Resolving here keeps the slow apt/apk work out of the build.
 RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist \
-        --no-progress --classmap-authoritative
+        --no-progress --classmap-authoritative --ignore-platform-reqs
 
 COPY . .
 RUN rm -rf /app/.git /app/tests /app/deploy /app/tools /app/bootstrap/cache/*.php \
@@ -42,7 +38,8 @@ LABEL org.opencontainers.image.title="work-report" \
       org.opencontainers.image.description="업무일보 — Jira-style work report with Excel export" \
       org.opencontainers.image.source="https://github.com/orangepro2001/work-report"
 
-RUN apk add --no-cache nginx supervisor tzdata curl libzip libpng freetype libjpeg-turbo icu-libs oniguruma \
+RUN apk add --no-cache nginx supervisor tzdata curl \
+        libzip libpng freetype libjpeg-turbo icu-libs oniguruma libpq \
     && apk add --no-cache --virtual .build $PHPIZE_DEPS libzip-dev libpng-dev freetype-dev \
         libjpeg-turbo-dev postgresql-dev icu-dev oniguruma-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
