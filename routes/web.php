@@ -39,5 +39,3 @@ Route::get('/export.xlsx', ExportController::class)->name('export');
 
 // Until SSO lands, the acting member is a session value (docs/auth-seam.md).
 Route::post('/actor', MemberSwitchController::class)->name('actor.switch');
-
-Route::get('/healthz', fn () => response('ok', 200)->header('Content-Type', 'text/plain'));
