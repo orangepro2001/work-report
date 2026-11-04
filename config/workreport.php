@@ -13,11 +13,25 @@ return [
 
     'timezone' => env('WR_TZ', 'Asia/Seoul'),
 
-    // Until the SSO project provides a real actor, the "current member" is this
-    // name. See docs/auth-seam.md — the resolver is the only place that changes.
-    'current_member' => env('WR_CURRENT_MEMBER', '이성민'),
-
     'department' => env('WR_DEPARTMENT', '검사 기술'),
+
+    /*
+     * The SSO this application signs in against (docs/auth-seam.md). Issuer,
+     * endpoints and the client registration all live at 521985.xyz/sso; the three
+     * paths below are fixed by that service's DESIGN.md (its discovery document
+     * publishes the same values).
+     */
+    'sso' => [
+        'issuer' => rtrim((string) env('SSO_ISSUER', 'https://521985.xyz/sso'), '/'),
+        'client_id' => env('SSO_CLIENT_ID'),
+        'client_secret' => env('SSO_CLIENT_SECRET'),
+        // Absolute, because the redirect_uri is registered verbatim on the SSO and
+        // url() would answer with whatever Host the request came in on.
+        'redirect_uri' => env('SSO_REDIRECT_URI'),
+        // The SSO's scope list is fixed (its config/sso.php): no `email` scope
+        // exists, because an account has no address to release.
+        'scope' => 'openid profile',
+    ],
 
     // Report title prefix, mirrored in B2 of the workbook: "DMT_ 검사 기술 일일업무 보고".
     'title_prefix' => env('WR_TITLE_PREFIX', 'DMT_ 검사 기술 일일업무 보고'),

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Issue;
+use App\Models\Member;
 use App\Models\Project;
 use App\Services\Excel\ReportExporter;
 use App\Services\Excel\XlsxPackager;
@@ -36,6 +37,8 @@ class ExcelExportGoldenTest extends TestCase
     {
         parent::setUp();
         $this->seed([MemberSeeder::class, IssueSeeder::class]);
+        // 이성민 is the report's author of record (B3 of the golden workbook).
+        $this->signInAs(Member::where('name', '이성민')->firstOrFail());
         $this->tmp = tempnam(sys_get_temp_dir(), 'wr').'.xlsx';
     }
 

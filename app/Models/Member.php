@@ -15,7 +15,7 @@ class Member extends Model
     use HasFactory;
 
     protected $fillable = [
-        'key', 'name', 'email', 'department', 'title',
+        'key', 'name', 'email', 'oidc_issuer', 'oidc_subject', 'department', 'title',
         'reports_to_id', 'color', 'position', 'active',
     ];
 

@@ -65,8 +65,8 @@ Keyboard: `c` new issue · `/` search · `g b` board · `g l` list · `g d` dail
 
 ```
 app/
-  Contracts/ActorResolver.php        ← the only seam for identity (SSO-ready)
-  Services/SessionActorResolver.php  ← current implementation: member switcher
+  Contracts/ActorResolver.php        ← the only seam for identity
+  Services/OidcActorResolver.php     ← the implementation: SSO claims → member
   Services/IssueKeyGenerator.php     ← atomic per-project numbering (3D-01)
   Services/Excel/
     ReportSheetWriter.php            ← sheet 업무일보, every colour and formula
@@ -124,12 +124,12 @@ blocks and the print setup.
 
 ## Identity and SSO
 
-There is no login yet, by design. `App\Contracts\ActorResolver` is the single
-place that decides who is acting; today `SessionActorResolver` reads a session
-value set by the member switcher in the top bar. When the separate SSO/OIDC
-application is ready, bind a different implementation in `AppServiceProvider` —
-controllers, views, policies and the schema stay untouched. See
-[docs/auth-seam.md](docs/auth-seam.md).
+Sign-in is the authorization center at <https://521985.xyz/sso>; there are no
+passwords in this application. `App\Contracts\ActorResolver` is the single place
+that decides who is acting, and `OidcActorResolver` is its only implementation: a
+session carrying OIDC claims → a `members` row keyed by `oidc_issuer`+`oidc_subject`
+(enrolled on first sign-in). Controllers, views, policies and the schema never see a
+token. See [docs/auth-seam.md](docs/auth-seam.md).
 
 ## Docs
 

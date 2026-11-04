@@ -1,94 +1,114 @@
-# The identity seam (SSO integration point)
+# The identity seam — SSO (OIDC)
 
-## Current state
+Sign-in is the authorization center at **<https://521985.xyz/sso>** (a separate
+Laravel OAuth 2.0 / OIDC issuer, see its own `DESIGN.md`). There is no password in
+this application: every page needs a session that carries OIDC claims, and the
+claims are the only thing the application ever knows about the person.
 
-There is **no login**. This is intentional: a separate SSO/OIDC application is being
-built and will be integrated later. Everything that needs to know "who is acting"
-asks one contract, so the integration is a one-class change.
+## The flow
 
-```php
-namespace App\Contracts;
-
-interface ActorResolver
-{
-    public function current(): ?Member;
-    public function require(): Member;
-}
+```
+GET /report/board
+      │  RequireActor: no claims in the session
+      ▼
+GET /report/auth/sso/redirect        → state (40 chars) into the session, then
+      │                                302 to {issuer}/oauth/authorize
+      ▼                               ?response_type=code&client_id=…
+GET https://521985.xyz/sso/login      the SSO authenticates the person
+      │                                 (its own session, its own forms)
+      ▼
+GET /report/auth/sso/callback?code=…&state=…
+      │  state compared with hash_equals, then
+      │  POST {issuer}/oauth/token   (client_secret_post, no PKCE: confidential client)
+      │  GET  {issuer}/oauth/userinfo (bearer)
+      ▼
+session['oidc.claims'] = {iss, sub, name, username}   → 302 to the intended URL
 ```
 
-Bound once, in `App\Providers\AppServiceProvider::register()`:
+The SSO identifies people by **username** and keeps no e-mail address (its commit
+`17c1222`), so `userinfo` returns `sub`, `name` and `preferred_username`. There is
+also no self-registration anywhere in it: an administrator creates every account
+with a display name, a username and a password, and people sign in with the last
+two only.
 
-```php
-$this->app->singleton(ActorResolver::class, fn () => new SessionActorResolver);
-```
+`/report/auth/sso/redirect`, `/report/auth/sso/callback`, `/report/auth/signed-out`
+and `/report/healthz` are the only public routes. Everything else sits inside
+`Route::middleware(RequireActor::class)`.
 
-### The current implementation
+## The resolver
 
-`SessionActorResolver` resolves the actor in this order:
+`App\Contracts\ActorResolver` is still the only way to learn who is acting;
+`OidcActorResolver` is the single implementation and `AppServiceProvider` is the
+single binding. `grep -rn 'Auth::' app/` stays empty — the app does not use the
+Laravel auth guards at all.
 
-1. `session('wr.actor_id')` — written by the member switcher in the top bar
-   (`POST /report/actor`, `MemberSwitchController`).
-2. `config('workreport.current_member')` — the `WR_CURRENT_MEMBER` env value.
-3. The first active member.
+`OidcActorResolver::current()`:
 
-The switcher is labelled in the UI as temporary (`ui.actor.hint`: "SSO 연동 전까지
-사용하는 임시 전환입니다").
+1. reads `session('oidc.claims')`; no claims ⇒ `null` ⇒ the middleware redirects;
+2. looks up `members` by `oidc_issuer` + `oidc_subject` (the pair the provider
+   guarantees is stable — a display name is not);
+3. on a first sign-in, enrols the person: the member `key` is derived once from
+   `preferred_username` (the string they type to sign in), and a seeded row whose
+   `key` already matches is **adopted** rather than duplicated, so their issue
+   history follows the person.
 
-## What is already in place for SSO
+`members.key` is never renumbered or recomputed: it is quoted in comments and the
+workbook, exactly like issue keys.
 
-The schema was designed for it from the start:
+## What is stored
 
-| Table | Column | SSO meaning |
+| Table | Column | Meaning |
 |---|---|---|
-| `members` | `key` (unique) | stable handle; becomes the OIDC `sub` link |
-| `members` | `email` (unique) | matches the OIDC `email` claim |
-| `issue_activities` | `actor_id` | every mutation is already attributed |
-| `issues` | `reporter_id`, `assignee_id` | already `members` foreign keys |
-| `issue_comments` | `author_id` | already `members` |
+| `members` | `oidc_issuer`, `oidc_subject` | unique pair, `NULL` until the first sign-in |
+| `members` | `key` | derived once from `preferred_username`; then never changes |
+| `members` | `email` | optional: the SSO keeps none, so this stays empty unless filled by hand |
+| `issue_activities` | `actor_id` | every mutation is attributed to the resolver's member |
+| `issues`, `issue_comments` | `reporter_id`, `assignee_id`, `author_id` | already members |
 
-Nothing is stored as a free-text name, so no data migration is needed.
+No token is stored: the session keeps claims only. Access tokens live 7 days on the
+SSO side, and the session (`SESSION_LIFETIME=720`, i.e. 12 h) dies long before one
+would need refreshing — an expired session simply walks the flow again.
 
-## Integration checklist
+## Signing out
 
-1. **Migration** — add `oidc_subject`, `oidc_issuer` to `members`
-   (nullable, unique together). Members keep existing rows and keys.
-2. **Resolver** — implement `OidcActorResolver`:
+`POST /report/auth/logout` forgets the claims and regenerates the session. That is
+**local only**: the SSO session stays open, and its logout is POST-only, so the
+signed-out page says so instead of pretending the person is gone. A browser that
+reopens the board is signed in silently.
 
-   ```php
-   final class OidcActorResolver implements ActorResolver
-   {
-       public function current(): ?Member
-       {
-           $claims = session('oidc.claims');
-           if (! $claims) return null;
+## Configuration
 
-           return Member::firstOrCreate(
-               ['oidc_issuer' => $claims['iss'], 'oidc_subject' => $claims['sub']],
-               ['key' => Str::slug($claims['email']), 'name' => $claims['name'],
-                'email' => $claims['email'], 'department' => config('workreport.department')],
-           );
-       }
+| Key | Meaning |
+|---|---|
+| `SSO_ISSUER` | issuer + base URL (`https://521985.xyz/sso`); endpoints are `{issuer}/oauth/authorize`, `/token`, `/userinfo` |
+| `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` | the confidential client registered on the SSO |
+| `SSO_REDIRECT_URI` | leave **empty**: `url('/auth/sso/callback')` then answers with the hostname the request arrived on, which is what lets one deployment serve both `521985.xyz/report` and `egg.tail9f7f1f.ts.net/report` |
 
-       public function require(): Member
-       {
-           return $this->current() ?? throw new AuthenticationException;
-       }
-   }
-   ```
+Both entries are registered on the SSO as exact redirect URIs — the SSO never
+redirects to a wildcard. Adding a third hostname means registering it there first.
 
-3. **Binding** — replace the singleton in `AppServiceProvider`. That is the whole
-   change; no controller, view, policy or test references the old class.
-4. **Routes** — add the OIDC login/callback routes, and wrap the route group in
-   `bootstrap/app.php` with `->middleware('auth')` once login is mandatory. The
-   `/report/healthz` route must stay public for the container health check.
-5. **Remove the switcher** — delete the `actor.switch` route, the
-   `partials/actor.blade.php` switcher and `SessionActorResolver`. `WR_CURRENT_MEMBER`
-   stops being read.
-6. **Cookie scope** — nothing to do: `SESSION_PATH=/report` is already correct for
-   the proxy mount point.
+## Linking a member before the first sign-in
+
+Enrolment is automatic, but pre-linking is better when the person already exists in
+the board (the four seeded members carry the issue history). The link is the pair
+the SSO sends — `iss` is its issuer and `sub` is the numeric user id as a string:
+
+```sql
+update members set oidc_issuer = 'https://521985.xyz/sso', oidc_subject = '4'
+ where key = 'chae-gilyong';   -- SSO username yzy
+```
+
+Two short-cuts follow from the same rule:
+
+- **Name the SSO username after the member key** (`lee-sungmin`, `jung-ungyo`) and
+the resolver adopts that seeded row on first sign-in without any SQL.
+- **Nothing is created twice.** A member whose `oidc_subject` is already set is
+found, never rewritten; a person with neither hint gets a fresh row whose `key` is
+their username.
 
 ## Constraint to preserve
 
-`ActorResolver` must stay the **only** way the application learns who is acting.
-If a controller ever calls `Auth::user()` directly, the integration point is broken.
-`grep -rn 'Auth::' app/` should stay empty.
+`ActorResolver` must stay the **only** way the application learns who is acting. If
+a controller ever calls `Auth::user()` or reads `session('oidc.claims')` directly,
+the seam is broken. Tests sign in through the seam too (`Tests\TestCase::signInAs`),
+never by stubbing a guard.

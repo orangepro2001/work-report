@@ -174,6 +174,7 @@ schema change is applied before nginx starts taking traffic.
 | Task | Command |
 |---|---|
 | Logs | `journalctl --user -u work-report -f` |
+| Sign-in failures | `journalctl --user -u work-report -n 100 \| grep -i sso` (then check the SSO's own log) |
 | Database logs | `journalctl --user -u work-report-db -f` |
 | Health | `curl -fsS http://127.0.0.1:3560/healthz` |
 | Backup | `deploy/scripts/backup.sh [keep]` → `~/backups/work-report/*.sql.gz` |
@@ -183,6 +184,23 @@ schema change is applied before nginx starts taking traffic.
 | Restart | `systemctl --user restart work-report` |
 | Remove | `deploy/scripts/uninstall.sh` |
 | Second instance | `WRP_NAME=work-report-test WRP_PORT=3561 deploy/scripts/install.sh` |
+
+## Identity
+
+Nobody reaches the board anonymously: every route except `healthz`, the three
+`auth/sso` routes and `auth/signed-out` requires OIDC claims (docs/auth-seam.md).
+Sign-in and the client registration both live on the SSO at
+<https://521985.xyz/sso>; the app keeps no users, passwords or tokens, only a
+`members` row per person with `oidc_issuer`/`oidc_subject` filled in on first
+sign-in.
+
+`SSO_CLIENT_ID`/`SSO_CLIENT_SECRET` come from the SSO's admin console
+(`/sso/admin/clients`). Register **both** public hostnames as redirect URIs:
+
+```
+https://521985.xyz/report/auth/sso/callback
+https://egg.tail9f7f1f.ts.net/report/auth/sso/callback
+```
 
 ## Container hardening
 

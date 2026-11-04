@@ -2,6 +2,7 @@
 
 namespace App\Services\Excel;
 
+use App\Contracts\ActorResolver;
 use App\Models\Issue;
 use App\Models\Member;
 use App\Models\Project;
@@ -81,7 +82,9 @@ final class ReportExporter
             }
         }
 
-        return (string) config('workreport.current_member');
+        // Written into B3 of the workbook: the signed-in person is the author
+        // unless the export was filtered to someone else (docs/auth-seam.md).
+        return (string) (app(ActorResolver::class)->current()?->name ?? '');
     }
 
     /** Filename for the Xlsx writer to operate on. */

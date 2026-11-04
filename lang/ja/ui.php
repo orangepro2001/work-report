@@ -120,10 +120,15 @@ return [
         'submit' => 'ダウンロード',
         'filename_hint' => 'ファイル名: 업무일보_YYYYMMDD.xlsx',
     ],
-    'actor' => [
-        'label' => '現在のユーザー',
-        'switch' => '切替',
-        'hint' => 'SSO 連携までの一時的な切替です',
+    'identity' => [
+        'label' => 'ユーザー',
+        'hint' => 'SSO（521985.xyz/sso）のアカウントでログインしています',
+        'logout' => 'ログアウト',
+        'denied' => 'SSO ログインがキャンセルされました。',
+        'signed_out_title' => 'ログアウトしました',
+        'signed_out_body' => 'この業務日報のセッションだけを消しました。SSO のセッションは残っているため、開き直すとすぐにログインされます。完全に終了するには SSO でもログアウトしてください。',
+        'open_sso' => 'SSO を開く',
+        'sign_in_again' => 'もう一度ログイン',
     ],
     'common' => [
         'save' => '保存',

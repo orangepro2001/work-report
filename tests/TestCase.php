@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\Member;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 
@@ -33,5 +34,28 @@ abstract class TestCase extends BaseTestCase
     protected function prepareUrlForRequest($uri)
     {
         return '/'.ltrim($uri, '/');
+    }
+
+    /**
+     * Sign a member in the way production does: OIDC claims in the session, matched
+     * to the member by issuer+subject (docs/auth-seam.md). Nothing is stubbed, so
+     * the tests exercise the resolver the app actually binds.
+     */
+    protected function signInAs(?Member $member = null): Member
+    {
+        $member ??= Member::query()->where('active', true)->orderBy('position')->firstOrFail();
+
+        $member->forceFill(['oidc_issuer' => 'https://sso.test', 'oidc_subject' => 'sub-'.$member->id])->save();
+
+        // Exactly the claims the SSO's userinfo returns: no e-mail, a username and
+        // a display name (docs/auth-seam.md).
+        $this->withSession(['oidc.claims' => [
+            'iss' => 'https://sso.test',
+            'sub' => 'sub-'.$member->id,
+            'name' => $member->name,
+            'username' => $member->key,
+        ]]);
+
+        return $member;
     }
 }

@@ -42,7 +42,7 @@
 
         <div class="topbar__spacer"></div>
 
-        @include('partials.actor')
+        @include('partials.identity')
 
         <a class="btn btn--primary" href="{{ route('board.index') }}" x-on:click.prevent="openCreate()">
             + {{ __('ui.board.create') }}

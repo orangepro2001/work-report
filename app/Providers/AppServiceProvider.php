@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\ActorResolver;
-use App\Services\SessionActorResolver;
+use App\Services\OidcActorResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Pagination\Paginator;
@@ -17,10 +17,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // The single seam for identity. When the SSO application is ready, bind an
-        // OIDC-backed implementation here and nothing else has to change
-        // (docs/auth-seam.md).
-        $this->app->singleton(ActorResolver::class, fn () => new SessionActorResolver);
+        // The single seam for identity: the SSO at 521985.xyz/sso is the only
+        // issuer, and OidcActorResolver is the only class that reads its claims
+        // (docs/auth-seam.md). Nothing else in the app learns who is acting.
+        $this->app->singleton(ActorResolver::class, fn () => new OidcActorResolver);
     }
 
     public function boot(): void

@@ -129,10 +129,15 @@ return [
         'filename_hint' => '파일 이름: 업무일보_YYYYMMDD.xlsx',
     ],
 
-    'actor' => [
-        'label' => '현재 사용자',
-        'switch' => '전환',
-        'hint' => 'SSO 연동 전까지 사용하는 임시 전환입니다',
+    'identity' => [
+        'label' => '사용자',
+        'hint' => 'SSO(521985.xyz/sso) 계정으로 로그인했습니다',
+        'logout' => '로그아웃',
+        'denied' => 'SSO 로그인이 취소되었습니다.',
+        'signed_out_title' => '로그아웃되었습니다',
+        'signed_out_body' => '이 업무일보의 세션만 지웠습니다. SSO 세션은 그대로 남아 있어, 다시 열면 즉시 로그인됩니다. 완전히 나가려면 SSO에서도 로그아웃하세요.',
+        'open_sso' => 'SSO로 이동',
+        'sign_in_again' => '다시 로그인',
     ],
 
     'common' => [

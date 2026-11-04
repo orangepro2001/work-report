@@ -25,6 +25,7 @@ class IssueCollaborationTest extends TestCase
     {
         parent::setUp();
         $this->seed([MemberSeeder::class, IssueSeeder::class]);
+        $this->signInAs(Member::where('name', '이성민')->firstOrFail());
     }
 
     public function test_creating_an_issue_allocates_the_next_key(): void
@@ -123,14 +124,41 @@ class IssueCollaborationTest extends TestCase
         $this->assertStringContainsString('<code>code</code>', $html);
     }
 
-    public function test_a_member_switcher_changes_the_actor(): void
+    public function test_an_anonymous_visitor_is_sent_to_the_sso(): void
     {
-        $member = Member::where('name', '정태훈')->firstOrFail();
+        // A fresh session with no claims: the middleware must hand over to the SSO
+        // instead of rendering the board.
+        $this->flushSession();
 
-        $this->post('/actor', ['member_id' => $member->id])->assertRedirect();
+        $this->get('/board')->assertRedirect(route('sso.redirect'));
+        $this->assertNull(app(ActorResolver::class)->current());
+    }
 
-        $this->assertSame($member->id, session('wr.actor_id'));
-        $this->assertSame($member->name, app(ActorResolver::class)->require()->name);
+    public function test_the_sso_redirect_carries_state_client_and_scope(): void
+    {
+        config([
+            'workreport.sso.issuer' => 'https://sso.test/sso',
+            'workreport.sso.client_id' => 'sso_client',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        $target = $this->get('/auth/sso/redirect')->assertRedirect()->headers->get('Location');
+        $parts = parse_url((string) $target);
+        parse_str($parts['query'] ?? '', $query);
+
+        $this->assertSame('https://sso.test/sso/oauth/authorize', $parts['scheme'].'://'.$parts['host'].$parts['path']);
+        $this->assertSame('code', $query['response_type']);
+        $this->assertSame('sso_client', $query['client_id']);
+        $this->assertSame('openid profile', $query['scope']);
+        $this->assertSame('https://board.test/report/auth/sso/callback', $query['redirect_uri']);
+        $this->assertSame(session('oidc.state'), $query['state']);
+    }
+
+    public function test_the_callback_rejects_a_reply_from_another_session(): void
+    {
+        session(['oidc.state' => 'ours']);
+
+        $this->get('/auth/sso/callback?state=theirs&code=abc')->assertForbidden();
     }
 
     public function test_validation_rejects_an_unknown_status(): void

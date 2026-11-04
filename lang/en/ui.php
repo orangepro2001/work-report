@@ -121,10 +121,15 @@ return [
         'submit' => 'Download',
         'filename_hint' => 'Filename: 업무일보_YYYYMMDD.xlsx',
     ],
-    'actor' => [
-        'label' => 'Acting as',
-        'switch' => 'Switch',
-        'hint' => 'Temporary switcher until SSO is wired up',
+    'identity' => [
+        'label' => 'User',
+        'hint' => 'Signed in with the SSO account (521985.xyz/sso)',
+        'logout' => 'Sign out',
+        'denied' => 'The SSO sign-in was cancelled.',
+        'signed_out_title' => 'Signed out',
+        'signed_out_body' => 'Only this board’s session was cleared. The SSO session is still open, so opening the board again signs you straight back in — sign out at the SSO to leave completely.',
+        'open_sso' => 'Open the SSO',
+        'sign_in_again' => 'Sign in again',
     ],
     'common' => [
         'save' => 'Save',

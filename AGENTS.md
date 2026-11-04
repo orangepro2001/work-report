@@ -19,7 +19,8 @@ gets into it. Read these before touching anything:
 ## Non-negotiables
 
 1. **`ActorResolver` is the only way to learn who is acting.**
-   `grep -rn 'Auth::' app/` must stay empty. There is no login yet, on purpose.
+   `grep -rn 'Auth::' app/` must stay empty. Sign-in is the SSO at 521985.xyz/sso and
+   lands in the session as claims; `OidcActorResolver` is the only reader of them.
 2. **Never renumber an issue key.** Numbers are allocated once
    (`App\Services\IssueKeyGenerator`) and survive deletions. The workbook's
    `COUNTIFS` formula renumbers; that is exactly what we do not do.
