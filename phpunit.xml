@@ -29,6 +29,10 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="work_report_test"/>
         <env name="DB_SSLMODE" value="require"/>
+        <!-- Persistent PDO connections are a production optimisation; combined with
+             RefreshDatabase they leak transaction state between tests. -->
+        <env name="DB_PERSISTENT" value="false"/>
+        <env name="DB_IDLE_TX_TIMEOUT" value="0"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

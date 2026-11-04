@@ -5,6 +5,7 @@ use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\MemberSwitchController;
+use App\Http\Middleware\ForceMountPath;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,3 +40,9 @@ Route::get('/export.xlsx', ExportController::class)->name('export');
 
 // Until SSO lands, the acting member is a session value (docs/auth-seam.md).
 Route::post('/actor', MemberSwitchController::class)->name('actor.switch');
+
+// Health: no session and no URL rewriting, always on the bare path. The container
+// health check, tailscale and monitoring all expect a fixed location.
+Route::get('/healthz', fn () => response('ok', 200)->header('Content-Type', 'text/plain'))
+    ->withoutMiddleware(ForceMountPath::class)
+    ->name('healthz');

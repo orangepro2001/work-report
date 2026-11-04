@@ -329,7 +329,10 @@ class ExcelExportGoldenTest extends TestCase
 
     public function test_export_route_streams_a_korean_filename(): void
     {
-        $response = $this->get('/report/export.xlsx?date=2026-11-04');
+        // Routes are registered at the root: the reverse proxy strips the /report
+        // mount prefix before forwarding (docs/deploy.md), and ForceMountPath puts it
+        // back into generated URLs only.
+        $response = $this->get('/export.xlsx?date=2026-11-04');
 
         $response->assertOk();
         $this->assertStringContainsString(

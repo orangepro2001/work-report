@@ -105,6 +105,10 @@ return [
             'options' => array_filter([
                 PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
             ], fn ($v) => $v !== null),
+            // A connection abandoned mid-transaction (an aborted test run, a killed
+            // worker) holds its table locks and wedges the next run. PostgreSQL can
+            // drop such a session itself.
+            'idle_in_transaction_session_timeout' => env('DB_IDLE_TX_TIMEOUT', '60s'),
         ],
 
         'sqlsrv' => [

@@ -1,39 +1,20 @@
 <?php
 
+use App\Http\Middleware\ForceMountPath;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-$basePath = trim((string) (getenv('WR_BASE_PATH') ?: '/report'), '/');
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
+        // Routes are registered at the root, always. The reverse proxy
+        // (`tailscale serve --set-path /report`) strips the mount prefix before
+        // forwarding, so the app genuinely receives bare paths; the prefix is put
+        // back into every generated URL by ForceMountPath.
+        web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        // Routes are registered below instead of through `web:` so the mount point
-        // (/report behind the reverse proxy, empty in a local dev server) is applied
-        // exactly once. Registering twice would make route() ambiguous.
-        then: function () use ($basePath) {
-            // Health lives at the root regardless of the mount point: the container
-            // health check, the proxy and monitoring all expect a fixed path.
-            Route::get('/healthz', fn () => response('ok', 200)
-                ->header('Content-Type', 'text/plain'))
-                ->withoutMiddleware('web');
-
-            $register = function () {
-                require __DIR__.'/../routes/web.php';
-            };
-
-            if ($basePath === '') {
-                Route::middleware('web')->group($register);
-
-                return;
-            }
-
-            Route::middleware('web')->prefix($basePath)->group($register);
-        },
     )
     ->withMiddleware(function (Middleware $middleware) {
         // tailscale serve terminates TLS and forwards X-Forwarded-* from loopback.
@@ -44,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PORT
                 | Request::HEADER_X_FORWARDED_PROTO,
         );
+
+        // Prepended, not appended: URL generation must be correct before any
+        // controller, middleware or error page builds a link.
+        $middleware->prependToGroup('web', ForceMountPath::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
