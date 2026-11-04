@@ -125,6 +125,7 @@ return [
         'label' => 'User',
         'hint' => 'Signed in with the SSO account (521985.xyz/sso)',
         'logout' => 'Sign out',
+        'state_lost' => 'The sign-in reply could not be matched to this session. Check that the browser accepts cookies, then try again.',
         'unreachable' => 'The SSO could not be reached. Try again in a moment.',
         'denied' => 'The SSO sign-in was cancelled.',
         'signed_out_title' => 'Signed out',

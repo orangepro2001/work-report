@@ -31,6 +31,11 @@ is NATed without hairpin NAT, so `curl https://521985.xyz` fails *from the machi
 that serves it*; a container that used the issuer for its own calls timed out and
 the callback answered 500.
 
+A callback whose `state` does not match is **not** a 403 page: another tab, a
+reloaded callback or a dropped cookie all produce one, and the person can do
+nothing with an error. The flow simply starts again (twice); the third consecutive
+failure assumes the browser is refusing the cookie and says so.
+
 The SSO identifies people by **username** and keeps no e-mail address (its commit
 `17c1222`), so `userinfo` returns `sub`, `name` and `preferred_username`. There is
 also no self-registration anywhere in it: an administrator creates every account

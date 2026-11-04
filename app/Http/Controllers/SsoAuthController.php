@@ -35,15 +35,17 @@ final class SsoAuthController extends Controller
         $state = (string) $request->session()->pull('oidc.state', '');
 
         // The state is the only thing tying this reply to the browser that started
-        // the flow; anything else can be replayed by a third party.
-        abort_unless(
-            $state !== '' && hash_equals($state, (string) $request->query('state')),
-            403,
-            'The sign-in reply did not belong to this session.',
-        );
+        // the flow. A mismatch is not an error the person can act on: another tab
+        // overwrote the state, the callback was reloaded, or the session cookie was
+        // dropped between the two legs. Start the flow again instead of showing a
+        // 403 wall (the guard against a loop lives in restart()).
+        if ($state === '' || ! hash_equals($state, (string) $request->query('state'))) {
+            return $this->restart($request, $state !== '');
+        }
 
+        // A person who cancels at the SSO comes back with ?error=… and no code.
         if ($request->query('error') !== null) {
-            return redirect()->route('board')->with('status', __('ui.identity.denied'));
+            return redirect()->route('signed-out')->with('status', __('ui.identity.denied'));
         }
 
         try {
@@ -60,9 +62,37 @@ final class SsoAuthController extends Controller
             return redirect()->route('signed-out')->with('status', __('ui.identity.unreachable'));
         }
 
+        $request->session()->forget('oidc.restarts');
         $request->session()->put(OidcActorResolver::SESSION_KEY, $claims);
 
         return redirect()->intended(route('board'));
+    }
+
+    /**
+     * Send the browser back through the authorization endpoint.
+     *
+     * A browser that refuses the session cookie would otherwise bounce between the
+     * two legs forever, so the third consecutive failure becomes a page that says
+     * what to check.
+     */
+    private function restart(Request $request, bool $sessionHadState): RedirectResponse
+    {
+        $attempts = (int) $request->session()->get('oidc.restarts', 0) + 1;
+
+        Log::warning('SSO callback did not match the session; restarting the flow', [
+            'session_had_state' => $sessionHadState,
+            'attempt' => $attempts,
+        ]);
+
+        if ($attempts > 2) {
+            $request->session()->forget('oidc.restarts');
+
+            abort(403, __('ui.identity.state_lost'));
+        }
+
+        $request->session()->put('oidc.restarts', $attempts);
+
+        return redirect()->route('sso.redirect');
     }
 
     /**

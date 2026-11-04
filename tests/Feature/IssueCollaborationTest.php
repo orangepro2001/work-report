@@ -155,11 +155,41 @@ class IssueCollaborationTest extends TestCase
         $this->assertSame(session('oidc.state'), $query['state']);
     }
 
-    public function test_the_callback_rejects_a_reply_from_another_session(): void
+    /**
+     * A stale or missing state is not something the person can act on: the flow
+     * simply starts again. Only a browser that keeps losing the state (no cookies)
+     * reaches a page, and that page says what to check.
+     */
+    public function test_a_reply_from_another_session_starts_the_flow_over(): void
     {
-        session(['oidc.state' => 'ours']);
+        $this->withSession(['oidc.state' => 'ours'])
+            ->get('/auth/sso/callback?state=theirs&code=abc')
+            ->assertRedirect(route('sso.redirect'));
 
-        $this->get('/auth/sso/callback?state=theirs&code=abc')->assertForbidden();
+        // Third consecutive failure: stop bouncing and explain.
+        $this->withSession(['oidc.state' => 'ours', 'oidc.restarts' => 2])
+            ->get('/auth/sso/callback?state=theirs&code=abc')
+            ->assertForbidden();
+    }
+
+    public function test_a_successful_callback_clears_the_restart_counter(): void
+    {
+        config([
+            'workreport.sso.issuer' => 'https://sso.test/sso',
+            'workreport.sso.internal_base' => 'http://127.0.0.1:3550',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        Http::fake([
+            'http://127.0.0.1:3550/oauth/token' => Http::response(['access_token' => 'tok']),
+            'http://127.0.0.1:3550/oauth/userinfo' => Http::response(['sub' => 'sub-1', 'preferred_username' => 'lee-sungmin']),
+        ]);
+
+        $this->withSession(['oidc.state' => 'st', 'oidc.restarts' => 1])
+            ->get('/auth/sso/callback?state=st&code=abc')
+            ->assertRedirect(route('board'));
+
+        $this->assertNull(session('oidc.restarts'));
     }
 
     /**
