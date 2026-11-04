@@ -15,9 +15,12 @@
                 // Translate the stored keys into the labels a person reads.
                 $params = [];
                 if ($verb === 'status_changed') {
+                    // The config entry is an array (key/label/tone); only the label is
+                    // printable. Passing the whole entry used to raise "Array to string
+                    // conversion" while rendering the timeline.
                     $params = [
-                        'from' => $statusByKey[$changes['from'] ?? ''] ?? ($changes['from'] ?? '—'),
-                        'to' => $statusByKey[$changes['to'] ?? ''] ?? ($changes['to'] ?? '—'),
+                        'from' => $statusByKey[$changes['from'] ?? '']['label'] ?? ($changes['from'] ?? '—'),
+                        'to' => $statusByKey[$changes['to'] ?? '']['label'] ?? ($changes['to'] ?? '—'),
                     ];
                 } elseif ($verb === 'percent_changed') {
                     $params = ['to' => $changes['to'] ?? '—'];

@@ -32,7 +32,7 @@
         <!-- Persistent PDO connections are a production optimisation; combined with
              RefreshDatabase they leak transaction state between tests. -->
         <env name="DB_PERSISTENT" value="false"/>
-        <env name="DB_IDLE_TX_TIMEOUT" value="0"/>
+        <env name="DB_IDLE_TX_TIMEOUT" value="180s"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

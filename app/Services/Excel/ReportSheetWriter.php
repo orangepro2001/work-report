@@ -388,37 +388,51 @@ final class ReportSheetWriter
 
         // Style every reserved slot, written or not: the empty rows must look unused
         // but keep their borders, exactly like the template.
-        for ($r = self::FIRST_DATA_ROW; $r <= self::LAST_DATA_ROW; $r++) {
-            $isLast = $r === self::LAST_DATA_ROW;
-            $bottom = $isLast ? Border::BORDER_THIN : Border::BORDER_HAIR;
-            $bottomColor = $isLast ? self::NAVY : self::HAIR;
+        //
+        // Styling is applied per *column range* rather than per cell. PhpSpreadsheet's
+        // getStyle() copies a Style object for every cell it touches, so the naive
+        // 61 rows × 13 columns loop allocated ~800 style objects and made this method
+        // 20x slower than the rest of the export combined (docs/perf.md). Grouping by
+        // property instead costs one range per rule.
+        $first = self::FIRST_DATA_ROW;
+        $last = self::LAST_DATA_ROW;
 
-            $sheet->getStyle("B{$r}:M{$r}")->applyFromArray([
-                'font' => ['name' => '맑은 고딕', 'size' => 10, 'color' => ['rgb' => self::INK]],
-                'borders' => ['bottom' => ['borderStyle' => $bottom, 'color' => ['rgb' => $bottomColor]]],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            ]);
+        // Base look of the whole block.
+        $sheet->getStyle("B{$first}:M{$last}")->applyFromArray([
+            'font' => ['name' => '맑은 고딕', 'size' => 10, 'color' => ['rgb' => self::INK]],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_HAIR, 'color' => ['rgb' => self::HAIR]]],
+            'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+        ]);
 
-            foreach (['B', 'C', 'D', 'F', 'G', 'H', 'I', 'J', 'K', 'L'] as $col) {
-                $sheet->getStyle("{$col}{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            }
-            $sheet->getStyle("E{$r}")->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_LEFT)->setIndent(1);
-            $sheet->getStyle("M{$r}")->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_LEFT)->setIndent(1);
+        // The last slot terminates the table with a heavier rule, like the template.
+        $sheet->getStyle("B{$last}:M{$last}")->applyFromArray([
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => self::NAVY]]],
+        ]);
 
-            $sheet->getStyle("B{$r}")->getFont()->setSize(9)->getColor()->setRGB(self::MUTED);
-            $sheet->getStyle("C{$r}")->getFont()->setSize(9)->setBold(true)->getColor()->setRGB(self::BLUE);
-            $sheet->getStyle("J{$r}")->getFont()->setBold(true);
-            $sheet->getStyle("M{$r}")->getFont()->setSize(9)->getColor()->setRGB(self::FAINT);
-
-            $sheet->getStyle("J{$r}")->getNumberFormat()->setFormatCode('0"%"');
-            // Date columns get the format only where a date lives; a text "미정"
-            // survives because the format is ignored for strings.
-            $sheet->getStyle("K{$r}")->getNumberFormat()->setFormatCode('mm/dd\ \(aaa\)');
-            $sheet->getStyle("L{$r}")->getNumberFormat()->setFormatCode('mm/dd\ \(aaa\)');
-            $sheet->getStyle("O{$r}")->getFont()->setName('맑은 고딕')->setSize(11);
+        // Centred columns.
+        foreach (['B', 'C', 'D', 'F', 'G', 'H', 'I', 'J', 'K', 'L'] as $col) {
+            $sheet->getStyle("{$col}{$first}:{$col}{$last}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
+
+        // Left, indented text columns (업무 내용 and 비고).
+        foreach (['E', 'M'] as $col) {
+            $sheet->getStyle("{$col}{$first}:{$col}{$last}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setIndent(1);
+        }
+
+        // Per-column typography.
+        $sheet->getStyle("B{$first}:B{$last}")->getFont()->setSize(9)->getColor()->setRGB(self::MUTED);
+        $sheet->getStyle("C{$first}:C{$last}")->getFont()->setSize(9)->setBold(true)->getColor()->setRGB(self::BLUE);
+        $sheet->getStyle("J{$first}:J{$last}")->getFont()->setBold(true);
+        $sheet->getStyle("M{$first}:M{$last}")->getFont()->setSize(9)->getColor()->setRGB(self::FAINT);
+        $sheet->getStyle("O{$first}:O{$last}")->getFont()->setName('맑은 고딕')->setSize(11);
+
+        // Number formats. The date format is applied to the whole column: a text
+        // "미정" ignores it, which is exactly what the template does.
+        $sheet->getStyle("J{$first}:J{$last}")->getNumberFormat()->setFormatCode('0"%"');
+        $sheet->getStyle("K{$first}:K{$last}")->getNumberFormat()->setFormatCode('mm/dd\ \(aaa\)');
+        $sheet->getStyle("L{$first}:L{$last}")->getNumberFormat()->setFormatCode('mm/dd\ \(aaa\)');
     }
 
     /* ------------------------------------------------------------------ */
@@ -431,40 +445,51 @@ final class ReportSheetWriter
         $d1 = self::LAST_DATA_ROW;
         $detail = "B{$d0}:M{$d1}";
 
+        // Rules are collected per range and applied once. Calling getStyle() +
+        // setConditionalStyles() for every rule copies the whole range's style array
+        // each time, which on B16:M76 (732 cells) was the single most expensive part
+        // of the export (docs/perf.md).
+        $rules = [];
+
+        $add = static function (string $range, Conditional $rule) use (&$rules): void {
+            $rules[$range][] = $rule;
+        };
+
         // Done rows: pale fill and grey text.
-        $this->expression($sheet, $detail, '$I'.$d0.'="완료"', fill: 'F3F6FB', font: self::MUTED);
+        $add($detail, self::expression('$I'.$d0.'="완료"', fill: 'F3F6FB', font: self::MUTED));
         // Zebra striping.
-        $this->expression($sheet, $detail, 'AND($D'.$d0.'<>"",MOD(ROW(),2)=0)', fill: self::ZEBRA);
+        $add($detail, self::expression('AND($D'.$d0.'<>"",MOD(ROW(),2)=0)', fill: self::ZEBRA));
 
         // Bucket tints on the 구분 column.
-        $bucketTints = ['3D AFVI' => 'E2EFDA', '2D AFVI' => 'DDEBF7', '기타' => 'EDEDED', '목표' => 'FCE4D6'];
-        foreach ($bucketTints as $bucket => $tint) {
-            $this->expression($sheet, "D{$d0}:D{$d1}", '$D'.$d0.'="'.$bucket.'"', fill: $tint, font: self::NAVY, bold: true);
+        foreach (['3D AFVI' => 'E2EFDA', '2D AFVI' => 'DDEBF7', '기타' => 'EDEDED', '목표' => 'FCE4D6'] as $bucket => $tint) {
+            $add("D{$d0}:D{$d1}", self::expression('$D'.$d0.'="'.$bucket.'"', fill: $tint, font: self::NAVY, bold: true));
         }
 
         // Priority emphasis.
-        $this->expression($sheet, "H{$d0}:H{$d1}", '$H'.$d0.'="High"', font: 'C00000', bold: true);
-        $this->expression($sheet, "H{$d0}:H{$d1}", '$H'.$d0.'="Medium"', font: 'B07D00', bold: true);
-        $this->expression($sheet, "H{$d0}:H{$d1}", '$H'.$d0.'="Low"', font: self::FAINT);
+        $add("H{$d0}:H{$d1}", self::expression('$H'.$d0.'="High"', font: 'C00000', bold: true));
+        $add("H{$d0}:H{$d1}", self::expression('$H'.$d0.'="Medium"', font: 'B07D00', bold: true));
+        $add("H{$d0}:H{$d1}", self::expression('$H'.$d0.'="Low"', font: self::FAINT));
 
         // Status emphasis.
-        $this->expression($sheet, "I{$d0}:I{$d1}", '$I'.$d0.'="완료"', font: '375623', fill: 'E2EFDA', bold: true);
-        $this->expression($sheet, "I{$d0}:I{$d1}", '$I'.$d0.'="진행 중"', font: '1F4E79', fill: 'DDEBF7', bold: true);
-        $this->expression($sheet, "I{$d0}:I{$d1}", '$I'.$d0.'="예정"', font: self::FAINT, fill: 'EDEDED');
-        $this->expression($sheet, "I{$d0}:I{$d1}", '$I'.$d0.'="보류"', font: 'C65911', fill: 'FCE4D6', bold: true);
+        $add("I{$d0}:I{$d1}", self::expression('$I'.$d0.'="완료"', font: '375623', fill: 'E2EFDA', bold: true));
+        $add("I{$d0}:I{$d1}", self::expression('$I'.$d0.'="진행 중"', font: '1F4E79', fill: 'DDEBF7', bold: true));
+        $add("I{$d0}:I{$d1}", self::expression('$I'.$d0.'="예정"', font: self::FAINT, fill: 'EDEDED'));
+        $add("I{$d0}:I{$d1}", self::expression('$I'.$d0.'="보류"', font: 'C65911', fill: 'FCE4D6', bold: true));
 
-        // Progress bar and the "done but not 100 %" contradiction flag.
+        // Progress bar, then the "done but not 100 %" contradiction flag, which has
+        // to win over the bar: stopIfTrue keeps Excel from painting both.
         $bar = new Conditional;
         $bar->setConditionType(Conditional::CONDITION_DATABAR)
             ->setDataBar(self::dataBar(0, 100, 'FFC000'));
-        $sheet->getStyle("J{$d0}:J{$d1}")->setConditionalStyles(
-            array_merge($sheet->getStyle("J{$d0}:J{$d1}")->getConditionalStyles(), [$bar])
-        );
-
-        $this->expression($sheet, "J{$d0}:J{$d1}", 'AND($I'.$d0.'="완료",N($J'.$d0.')<>100)', fill: 'FDE9E9', font: 'C00000', bold: true);
+        $add("J{$d0}:J{$d1}", $bar);
+        $add("J{$d0}:J{$d1}", self::expression('AND($I'.$d0.'="완료",N($J'.$d0.')<>100)', fill: 'FDE9E9', font: 'C00000', bold: true));
 
         // Overdue highlight reads the report date in D3.
-        $this->expression($sheet, "L{$d0}:L{$d1}", 'AND($L'.$d0.'<>"",$I'.$d0.'<>"완료",$L'.$d0.'<$D$3)', font: 'C00000', bold: true);
+        $add("L{$d0}:L{$d1}", self::expression('AND($L'.$d0.'<>"",$I'.$d0.'<>"완료",$L'.$d0.'<$D$3)', font: 'C00000', bold: true));
+
+        foreach ($rules as $range => $set) {
+            $sheet->getStyle($range)->setConditionalStyles($set);
+        }
     }
 
     /** A 0-100 (or custom) data bar, the workbook's only non-expression rule. */
@@ -478,42 +503,33 @@ final class ReportSheetWriter
         return $bar;
     }
 
-    /**
-     * Appends one formula-based conditional rule, merging with rules that already
-     * apply to the same range (PhpSpreadsheet replaces the whole array otherwise).
-     */
-    private function expression(
-        Worksheet $sheet,
-        string $range,
+    /** One formula-based conditional rule with an optional dxf style. */
+    private static function expression(
         string $formula,
         ?string $font = null,
         ?string $fill = null,
         bool $bold = false,
-    ): void {
+    ): Conditional {
         $rule = new Conditional;
         $rule->setConditionType(Conditional::CONDITION_EXPRESSION)
             ->setOperatorType(Conditional::OPERATOR_EQUAL)
             ->addCondition($formula);
 
-        $style = new Style;
-        if ($fill !== null) {
-            $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($fill);
-        }
-        if ($font !== null || $bold) {
+        if ($fill !== null || $font !== null || $bold) {
+            $style = new Style;
+            if ($fill !== null) {
+                $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($fill);
+            }
             if ($font !== null) {
                 $style->getFont()->getColor()->setRGB($font);
             }
             if ($bold) {
                 $style->getFont()->setBold(true);
             }
-        }
-        if ($fill !== null || $font !== null || $bold) {
             $rule->setStyle($style);
         }
 
-        $existing = $sheet->getStyle($range)->getConditionalStyles();
-        $existing[] = $rule;
-        $sheet->getStyle($range)->setConditionalStyles($existing);
+        return $rule;
     }
 
     /* ------------------------------------------------------------------ */
