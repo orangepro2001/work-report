@@ -13,6 +13,7 @@ if [ -n "$prev" ] && [ "$prev" = "$(podman image inspect "$WRP_IMAGE:$ver" --for
     log "$ver is already current"
     if ! systemctl --user is-active -q "$WRP_NAME.service"; then
         render_quadlet
+        render_backup_units
         systemctl --user daemon-reload
         systemctl --user start "$WRP_NAME.service"
         wait_healthy 120 || die "$WRP_NAME did not become healthy"
@@ -23,6 +24,7 @@ fi
 [ -n "$prev" ] && podman tag "$prev" "$WRP_IMAGE:previous"
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 render_quadlet
+render_backup_units
 systemctl --user daemon-reload
 systemctl --user restart "$WRP_NAME.service"
 

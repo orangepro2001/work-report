@@ -1,0 +1,16 @@
+# Daily offsite mirror of the local database onto the AI host (docs/deploy.md).
+# Installed by deploy/scripts/install.sh into ~/.config/systemd/user/.
+# 03:40 sits inside the quiet window after the AI host's own 03:30 PxSpecTool dump.
+
+[Unit]
+Description=@NAME@ — daily database mirror to the AI host
+
+[Timer]
+OnCalendar=*-*-* 03:40:00
+# A host that was down at 03:40 mirrors once on the next boot instead of waiting
+# a whole day; the timer is a mirror, so "late" is always better than "skipped".
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

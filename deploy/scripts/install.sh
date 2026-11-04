@@ -43,9 +43,16 @@ build_image "$ver"
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 
 render_quadlet
+render_backup_units
 systemctl --user daemon-reload
 systemctl --user start "$WRP_NAME.service"
 wait_healthy 120 || { journalctl --user -u "$WRP_NAME" -n 60 --no-pager; die "service did not become healthy"; }
 
+# The mirror timer is part of the install: a database with no copy anywhere else
+# is one disk failure away from an empty board (docs/deploy.md).
+systemctl --user enable --now "$WRP_NAME-backup-offsite.timer"
+
 log "installed $ver"
+log "offsite mirror: $WRP_NAME-backup-offsite.timer, first run 03:40; check with"
+log "  deploy/scripts/backup-offsite.sh    (runs now, pushes to the AI host)"
 log "expose it with:  tailscale serve --bg --set-path /report http://127.0.0.1:$WRP_PORT"

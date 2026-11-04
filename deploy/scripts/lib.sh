@@ -68,3 +68,17 @@ render_quadlet() {
         -e "s/systemd-\(.*\)-work-report/systemd-\1-$WRP_NAME/" \
         "$WRP_SRC/deploy/quadlet/work-report.container" > "$QUADLET_DIR/$WRP_NAME.container"
 }
+
+# render_backup_units installs the offsite-mirror unit pair. The service calls
+# the script in this tree, so the source path is baked in at install time. The
+# substitutions run in two passes — name first, path second — so a source path
+# that itself contains "work-report" cannot be rewritten by the name pass.
+render_backup_units() {
+    local dir=$HOME/.config/systemd/user
+    mkdir -p "$dir"
+    sed -e "s/@NAME@/$WRP_NAME/g" \
+        "$WRP_SRC/deploy/systemd/work-report-backup-offsite.service" \
+        | sed -e "s|@SCRIPT@|$WRP_SRC/deploy/scripts/backup-offsite.sh|" > "$dir/$WRP_NAME-backup-offsite.service"
+    sed -e "s/@NAME@/$WRP_NAME/g" \
+        "$WRP_SRC/deploy/systemd/work-report-backup-offsite.timer" > "$dir/$WRP_NAME-backup-offsite.timer"
+}

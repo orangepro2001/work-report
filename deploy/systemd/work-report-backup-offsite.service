@@ -1,0 +1,19 @@
+# systemd user unit for the offsite database mirror (docs/deploy.md).
+# Installed by deploy/scripts/install.sh into ~/.config/systemd/user/; the
+# instance name and the script path are filled in by lib.sh at install time.
+# Started by the matching -backup-offsite.timer, not enabled by itself.
+
+[Unit]
+Description=@NAME@ — mirror the database dump to the AI host
+Wants=network-online.target
+After=network-online.target @NAME@-db.service
+Requires=@NAME@-db.service
+
+[Service]
+Type=oneshot
+ExecStart=@SCRIPT@
+# Backup work must never compete with a board request for CPU or disk.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=600

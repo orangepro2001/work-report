@@ -62,12 +62,42 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 The entrypoint runs `CREATE EXTENSION IF NOT EXISTS pg_trgm` on every boot, so a
 restored dump never has to remember it.
 
+### Local is the only default
+
+Every checked-in file points at `127.0.0.1:5433`: `.env.example`,
+`deploy/env/work-report.env.example` and the live `~/.config/work-report/env`. The
+AI-host cluster survives as the rollback point below and nothing else — it is never
+picked up implicitly, and the commented block at the bottom of the env example is
+the only place that mentions it.
+
+### Offsite mirror (the standby copy)
+
+`deploy/scripts/backup-offsite.sh` dumps this host's database and replaces
+`~/backups/work-report/work-report.sql.gz` on the AI host. One file, overwritten
+each run — the AI host is a standby, not an archive; generations stay here (see
+`deploy/scripts/backup.sh`). Scheduled by `work-report-backup-offsite.timer`
+(daily 03:40, `Persistent=true`, up to 10 min jitter), installed by `install.sh`.
+
+The dump only replaces the previous one after `gzip -t` passes on both ends and
+the byte counts match, so a half-written or truncated file never becomes "the
+backup". The last successful dump also stays at
+`~/.local/state/work-report/offsite/work-report.sql.gz` — an unreachable AI host
+therefore costs freshness, never the copy. Restore:
+
+```sh
+zcat ~/.local/state/work-report/offsite/work-report.sql.gz \
+  | podman exec -i work-report-db psql -U work_report -d work_report
+```
+
 ### Rollback point
 
 The previous instance (`pxspec-pg` on the AI host, database `work_report`) still
-holds a copy of the data as of the migration. To go back, point `DB_HOST`/`DB_PORT`
-in `~/.config/work-report/env` at `100.101.146.117:5432`, set
-`DB_SSLMODE=require`, and restart the service. Nothing in the schema differs.
+holds a copy of the data as of the migration, and the mirror above keeps a fresher
+dump beside it (`/home/tony/backups/work-report/`). To go back to the migrated
+state, point `DB_HOST`/`DB_PORT` in `~/.config/work-report/env` at
+`100.101.146.117:5432`, set `DB_SSLMODE=require`, and restart the service. Nothing
+in the schema differs. The mirror host is `AI` in `~/.ssh/config`; its dumps are
+plain SQL (`pg_dump` without `-F`), so any of them loads with `psql` alone.
 
 ### Test database
 
@@ -93,7 +123,7 @@ deploy/scripts/install.sh
 
 `install.sh` creates the data volume, renders both Quadlet units (database and
 application), builds the image, tags it `:current`, starts `work-report-db` then
-`work-report`, and waits for `/healthz`.
+`work-report`, waits for `/healthz`, and enables the daily offsite mirror.
 
 Then expose it:
 
@@ -121,6 +151,8 @@ schema change is applied before nginx starts taking traffic.
 | Database logs | `journalctl --user -u work-report-db -f` |
 | Health | `curl -fsS http://127.0.0.1:3560/healthz` |
 | Backup | `deploy/scripts/backup.sh [keep]` → `~/backups/work-report/*.sql.gz` |
+| Offsite mirror | `deploy/scripts/backup-offsite.sh` → `AI:~/backups/work-report/work-report.sql.gz` |
+| Mirror status | `systemctl --user list-timers work-report-backup-offsite.timer` / `journalctl --user -u work-report-backup-offsite -n 20` |
 | Dump by hand | `podman exec work-report-db pg_dump -U work_report work_report \| gzip > dump.sql.gz` |
 | Restart | `systemctl --user restart work-report` |
 | Remove | `deploy/scripts/uninstall.sh` |

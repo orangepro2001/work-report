@@ -47,7 +47,7 @@ rewriting the produced archive. Every step has a test.
 podman build -f /tmp/dev.Dockerfile -t localhost/wr-dev .        # once
 podman build --format docker -f deploy/Containerfile -t localhost/work-report:current .
 
-composer test        # 20 tests, needs a LOCAL PostgreSQL (see README)
+composer test        # 28 tests, needs a LOCAL PostgreSQL (see README)
 composer lint        # pint --test
 python3 tools/inspect_xlsx.py docs/source-rev02.xlsx > /tmp/dump.json
 ```
@@ -55,9 +55,17 @@ python3 tools/inspect_xlsx.py docs/source-rev02.xlsx > /tmp/dump.json
 Deploy: `bash deploy/scripts/upgrade.sh` (builds, health-checks, rolls back on
 failure). Production: <https://egg.tail9f7f1f.ts.net/report>. Two Quadlet units run
 on that host: `work-report` (the app, 0.0.0.0:3560) and `work-report-db`
-(PostgreSQL, 127.0.0.1:5433).
+(PostgreSQL, 127.0.0.1:5433). The database's standby copy is one dump file mirrored
+to the `AI` host every night (`deploy/scripts/backup-offsite.sh`, timer
+`work-report-backup-offsite`); the connection is push-only, from here.
 
 ## Gotchas that cost time already
+
+- **The offsite mirror replaces, it does not accumulate.** `work-report.sql.gz` on
+  the AI host is overwritten daily; if you need a point two weeks back, that lives
+  in `~/backups/work-report/` here via `backup.sh`. The mirror refuses to overwrite
+  unless `gzip -t` passes on both ends and the sizes match — a red
+  `work-report-backup-offsite` unit means the old copy is still good.
 
 - **`tailscale serve --set-path /report` strips the prefix.** Routes are
   registered at the root; `ForceMountPath` puts the prefix back into generated
