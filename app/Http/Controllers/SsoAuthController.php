@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Services\OidcActorResolver;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -43,7 +46,19 @@ final class SsoAuthController extends Controller
             return redirect()->route('board')->with('status', __('ui.identity.denied'));
         }
 
-        $claims = $this->claimsFor((string) $request->query('code'));
+        try {
+            $claims = $this->claimsFor((string) $request->query('code'));
+        } catch (ConnectionException|RequestException $e) {
+            // A bare 500 tells the person nothing. The SSO being unreachable is an
+            // infrastructure fault, so it gets a page that says so, and the address
+            // that failed lands in the log.
+            Log::error('SSO is unreachable', [
+                'base' => config('workreport.sso.internal_base'),
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('signed-out')->with('status', __('ui.identity.unreachable'));
+        }
 
         $request->session()->put(OidcActorResolver::SESSION_KEY, $claims);
 
@@ -84,10 +99,15 @@ final class SsoAuthController extends Controller
      */
     private function claimsFor(string $code): array
     {
-        $issuer = config('workreport.sso.issuer');
+        // Server-to-server calls go to internal_base, never to the public issuer:
+        // the SSO is on this host and the public address is NATed without hairpin
+        // (docs/auth-seam.md). The browser keeps using the issuer.
+        $base = (string) config('workreport.sso.internal_base');
 
+        // Failures bubble up to callback(), which turns them into a page a person
+        // can read instead of a 500.
         $token = Http::asForm()->acceptJson()->timeout(15)
-            ->post($issuer.'/oauth/token', [
+            ->post($base.'/oauth/token', [
                 'grant_type' => 'authorization_code',
                 'code' => $code,
                 'redirect_uri' => $this->redirectUri(),
@@ -97,17 +117,17 @@ final class SsoAuthController extends Controller
             ->throw()
             ->json();
 
-        abort_unless(is_string($token['access_token'] ?? null), 502, 'The SSO returned no access token.');
-
-        $info = Http::withToken($token['access_token'])->acceptJson()->timeout(15)
-            ->get($issuer.'/oauth/userinfo')
+        $info = Http::withToken((string) ($token['access_token'] ?? ''))->acceptJson()->timeout(15)
+            ->get($base.'/oauth/userinfo')
             ->throw()
             ->json();
+
+        abort_unless(is_string($token['access_token'] ?? null), 502, 'The SSO returned no access token.');
 
         abort_unless(is_string($info['sub'] ?? null) && $info['sub'] !== '', 502, 'The SSO returned no subject.');
 
         return [
-            'iss' => (string) ($info['iss'] ?? $issuer),
+            'iss' => (string) ($info['iss'] ?? config('workreport.sso.issuer')),
             'sub' => (string) $info['sub'],
             'name' => (string) ($info['name'] ?? ''),
             'username' => (string) ($info['preferred_username'] ?? ''),

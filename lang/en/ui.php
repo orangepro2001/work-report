@@ -125,6 +125,7 @@ return [
         'label' => 'User',
         'hint' => 'Signed in with the SSO account (521985.xyz/sso)',
         'logout' => 'Sign out',
+        'unreachable' => 'The SSO could not be reached. Try again in a moment.',
         'denied' => 'The SSO sign-in was cancelled.',
         'signed_out_title' => 'Signed out',
         'signed_out_body' => 'Only this board’s session was cleared. The SSO session is still open, so opening the board again signs you straight back in — sign out at the SSO to leave completely.',

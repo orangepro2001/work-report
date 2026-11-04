@@ -23,6 +23,16 @@ return [
      */
     'sso' => [
         'issuer' => rtrim((string) env('SSO_ISSUER', 'https://521985.xyz/sso'), '/'),
+
+        /*
+         * Where this application reaches the SSO for the token exchange and
+         * userinfo. The SSO runs on this host and the public address is NATed
+         * without hairpin, so a container that trusted SSO_ISSUER for its own
+         * calls timed out (cURL 28) while the browser was fine. The browser keeps
+         * using the issuer; only the server-to-server calls come over loopback.
+         */
+        'internal_base' => rtrim((string) (env('SSO_INTERNAL_BASE') ?: env('SSO_ISSUER', 'https://521985.xyz/sso')), '/'),
+
         'client_id' => env('SSO_CLIENT_ID'),
         'client_secret' => env('SSO_CLIENT_SECRET'),
         // Absolute, because the redirect_uri is registered verbatim on the SSO and

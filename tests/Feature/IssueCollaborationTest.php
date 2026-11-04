@@ -10,6 +10,7 @@ use App\Models\Project;
 use Database\Seeders\IssueSeeder;
 use Database\Seeders\MemberSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -159,6 +160,66 @@ class IssueCollaborationTest extends TestCase
         session(['oidc.state' => 'ours']);
 
         $this->get('/auth/sso/callback?state=theirs&code=abc')->assertForbidden();
+    }
+
+    /**
+     * The whole dance, with the two server-to-server calls faked. This is the test
+     * that was missing when the token exchange was pointed at the public issuer and
+     * timed out: the app must talk to the SSO over internal_base, not to the address
+     * the browser uses (docs/auth-seam.md).
+     */
+    public function test_the_callback_exchanges_the_code_and_adopts_the_member(): void
+    {
+        config([
+            'workreport.sso.issuer' => 'https://sso.test/sso',
+            'workreport.sso.internal_base' => 'http://127.0.0.1:3550',
+            'workreport.sso.client_id' => 'sso_client',
+            'workreport.sso.client_secret' => 'sso_secret',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        // 정태훈 is already linked to SSO sub 6, so the claims must land on it. The
+        // issuer is the configured one: userinfo does not repeat `iss`, so the app
+        // stores config('workreport.sso.issuer') and the link must use the same value.
+        $member = Member::where('key', 'jung-taehun')->firstOrFail();
+        $member->forceFill(['oidc_issuer' => 'https://sso.test/sso', 'oidc_subject' => '6'])->save();
+
+        Http::fake([
+            'http://127.0.0.1:3550/oauth/token' => Http::response(['access_token' => 'tok']),
+            'http://127.0.0.1:3550/oauth/userinfo' => Http::response([
+                'sub' => '6', 'name' => '정태훈 대리', 'preferred_username' => 'tony',
+            ]),
+        ]);
+
+        $this->withSession(['oidc.state' => 'round-trip'])
+            ->get('/auth/sso/callback?state=round-trip&code=abc')
+            ->assertRedirect(route('board'));
+
+        // Sent to the loopback base and with the registered redirect_uri, not the
+        // public host the browser came from.
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'http://127.0.0.1:3550/oauth/token')
+            && $request['redirect_uri'] === 'https://board.test/report/auth/sso/callback'
+            && $request['client_secret'] === 'sso_secret');
+
+        $this->assertSame('tony', session('oidc.claims.username'));
+        $this->assertSame($member->id, app(ActorResolver::class)->require()->id);
+        // Nothing new was created: the subject was already linked.
+        $this->assertSame(4, Member::count());
+    }
+
+    public function test_an_unreachable_sso_is_reported_instead_of_a_500(): void
+    {
+        config([
+            'workreport.sso.internal_base' => 'http://127.0.0.1:1',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        Http::fake(['*' => Http::failedConnection()]);
+
+        $this->withSession(['oidc.state' => 'st'])
+            ->get('/auth/sso/callback?state=st&code=abc')
+            ->assertRedirect(route('signed-out'))
+            ->assertSessionHas('status', __('ui.identity.unreachable'));
     }
 
     public function test_validation_rejects_an_unknown_status(): void

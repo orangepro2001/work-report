@@ -19,11 +19,17 @@ GET https://521985.xyz/sso/login      the SSO authenticates the person
       ▼
 GET /report/auth/sso/callback?code=…&state=…
       │  state compared with hash_equals, then
-      │  POST {issuer}/oauth/token   (client_secret_post, no PKCE: confidential client)
-      │  GET  {issuer}/oauth/userinfo (bearer)
+      │  POST {internal_base}/oauth/token   (client_secret_post, no PKCE: confidential client)
+      │  GET  {internal_base}/oauth/userinfo (bearer)
       ▼
 session['oidc.claims'] = {iss, sub, name, username}   → 302 to the intended URL
 ```
+
+Note the two bases: the **browser** is sent to the issuer, while the **server**
+calls the SSO over the loopback (`SSO_INTERNAL_BASE`). This host's public address
+is NATed without hairpin NAT, so `curl https://521985.xyz` fails *from the machine
+that serves it*; a container that used the issuer for its own calls timed out and
+the callback answered 500.
 
 The SSO identifies people by **username** and keeps no e-mail address (its commit
 `17c1222`), so `userinfo` returns `sub`, `name` and `preferred_username`. There is
@@ -83,6 +89,7 @@ reopens the board is signed in silently.
 | `SSO_ISSUER` | issuer + base URL (`https://521985.xyz/sso`); endpoints are `{issuer}/oauth/authorize`, `/token`, `/userinfo` |
 | `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` | the confidential client registered on the SSO |
 | `SSO_REDIRECT_URI` | leave **empty**: `url('/auth/sso/callback')` then answers with the hostname the request arrived on, which is what lets one deployment serve both `521985.xyz/report` and `egg.tail9f7f1f.ts.net/report` |
+| `SSO_INTERNAL_BASE` | where the **server** reaches the SSO (`http://127.0.0.1:3550`). Split horizon: the browser uses `SSO_ISSUER`, the token exchange and `userinfo` use this. The public address is NATed without hairpin, so a container calling the issuer times out — that failure looked exactly like a 500 on the callback |
 
 Both entries are registered on the SSO as exact redirect URIs — the SSO never
 redirects to a wildcard. Adding a third hostname means registering it there first.

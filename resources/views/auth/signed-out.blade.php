@@ -9,6 +9,9 @@
 <body>
 <main class="main" style="max-width:560px;margin:14vh auto">
     <h1 class="h2">{{ __('ui.identity.signed_out_title') }}</h1>
+    @if (session('status'))
+        <p class="flash" role="status">{{ session('status') }}</p>
+    @endif
     <p class="muted">{{ __('ui.identity.signed_out_body') }}</p>
     <p>
         <a class="btn" href="{{ config('workreport.sso.issuer') }}">{{ __('ui.identity.open_sso') }}</a>
