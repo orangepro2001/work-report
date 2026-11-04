@@ -1,0 +1,5 @@
+# The database cluster. A named volume, not a bind mount, so a SELinux relabel or a
+# moved checkout can never orphan the data.
+[Volume]
+VolumeName=work-report-db-data
+Driver=local

@@ -53,7 +53,9 @@ python3 tools/inspect_xlsx.py docs/source-rev02.xlsx > /tmp/dump.json
 ```
 
 Deploy: `bash deploy/scripts/upgrade.sh` (builds, health-checks, rolls back on
-failure). Production: <https://egg.tail9f7f1f.ts.net/report>.
+failure). Production: <https://egg.tail9f7f1f.ts.net/report>. Two Quadlet units run
+on that host: `work-report` (the app, 0.0.0.0:3560) and `work-report-db`
+(PostgreSQL, 127.0.0.1:5433).
 
 ## Gotchas that cost time already
 
@@ -61,9 +63,11 @@ failure). Production: <https://egg.tail9f7f1f.ts.net/report>.
   registered at the root; `ForceMountPath` puts the prefix back into generated
   URLs. nginx rewrites `/report/*` away for direct access. Do not "fix" this by
   prefixing the route group.
-- **Tests need a local database.** Against the tailnet instance a suite takes
-  minutes because of packet loss, and an interrupted run leaves a transaction
-  holding locks (`idle_in_transaction_session_timeout` now prevents the wedge).
+- **Tests need their own local database** (`wr-pg-test` on 5442). An interrupted
+  run used to leave a transaction holding table locks and wedge the next one;
+  `idle_in_transaction_session_timeout` is now set on every connection.
+- **Never run two suites at once.** Killing the *shell* leaves the test container
+  alive, and two suites colliding on `migrate:fresh` deadlock. `podman ps` first.
 - **`SET` takes no bind parameters** in PostgreSQL, and a unit form like `20s`
   must be a string literal.
 - **Persistent PDO connections and `RefreshDatabase` do not mix** — the test

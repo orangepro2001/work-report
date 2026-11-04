@@ -12,6 +12,7 @@ set -euo pipefail
 
 WRP_NAME=${WRP_NAME:-work-report}
 WRP_PORT=${WRP_PORT:-3560}
+WRP_DB_PORT=${WRP_DB_PORT:-5433}
 WRP_IMAGE=${WRP_IMAGE:-localhost/$WRP_NAME}
 WRP_SRC=${WRP_SRC:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}
 CONF_DIR=$HOME/.config/$WRP_NAME
@@ -51,6 +52,14 @@ wait_healthy() { # [seconds]
 # instance parameters into the checked-in templates.
 render_quadlet() {
     mkdir -p "$QUADLET_DIR"
+    # The database unit is part of the stack: it must come up before the app.
+    sed -e "s/work-report-db/$WRP_NAME-db/g" \
+        -e "s#%h/.config/work-report/db.env#%h/.config/$WRP_NAME/db.env#" \
+        -e "s/127.0.0.1:5433/127.0.0.1:$WRP_DB_PORT/" \
+        "$WRP_SRC/deploy/quadlet/work-report-db.container" > "$QUADLET_DIR/$WRP_NAME-db.container"
+    sed -e "s/work-report-db-data/$WRP_NAME-db-data/g" \
+        "$WRP_SRC/deploy/quadlet/work-report-db-data.volume" > "$QUADLET_DIR/$WRP_NAME-db-data.volume"
+
     sed -e "s/work-report-env/$WRP_NAME-env/g" \
         -e "s/ContainerName=work-report/ContainerName=$WRP_NAME/" \
         -e "s#localhost/work-report:current#$WRP_IMAGE:current#" \

@@ -22,14 +22,15 @@ several people can work in at the same time.
 |---|---|
 | ![board](docs/img/board.png) | ![daily](docs/img/daily.png) |
 
-**Production**: <https://egg.tail9f7f1f.ts.net/report> (tailnet only)
+**Production**: <https://egg.tail9f7f1f.ts.net/report> (tailnet only) — board 0.09 s,
+Excel export 0.30 s, PostgreSQL on the same host.
 
 ## Quick start
 
 ```sh
 cp .env.example .env
 php artisan key:generate
-# fill in DB_* (PostgreSQL), then:
+# fill in DB_* (PostgreSQL — see docs/deploy.md for the container recipe), then:
 php artisan migrate --seed
 php artisan serve
 ```
@@ -103,9 +104,8 @@ composer fix             # pint
 python3 tools/inspect_xlsx.py docs/source-rev02.xlsx   # re-extract the spec
 ```
 
-Tests need a PostgreSQL. Point them at a **local** instance, not the production one
-on the tailnet: the suite creates and drops its schema, and packet loss on a remote
-link turns 18 seconds into several minutes.
+Tests need a PostgreSQL. Point them at a **separate local** instance, never at the
+production one: the suite drops and recreates its schema.
 
 ```sh
 podman run -d --name wr-pg-test -p 127.0.0.1:5442:5432 \

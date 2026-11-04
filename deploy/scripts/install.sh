@@ -27,6 +27,17 @@ fi
 grep -q '^APP_KEY=.\+' "$CONF_DIR/env" || die "APP_KEY is empty in $CONF_DIR/env"
 grep -q '^DB_PASSWORD=.\+' "$CONF_DIR/env" || die "DB_PASSWORD is empty in $CONF_DIR/env"
 
+# The database runs on this host as its own Quadlet unit (docs/deploy.md). Its
+# credentials have to exist before the app unit is rendered.
+if [ ! -f "$CONF_DIR/db.env" ]; then
+    die "missing $CONF_DIR/db.env — copy deploy/env/work-report-db.env.example and set POSTGRES_PASSWORD"
+fi
+
+if ! podman volume exists "$WRP_NAME-db-data"; then
+    podman volume create "$WRP_NAME-db-data" >/dev/null
+    log "created volume $WRP_NAME-db-data (first boot initialises the cluster)"
+fi
+
 ver=$(src_version)
 build_image "$ver"
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"

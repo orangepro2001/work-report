@@ -1,0 +1,38 @@
+# Quadlet unit for the work-report PostgreSQL instance.
+#
+# The database lives on this host now (docs/deploy.md): the application and the
+# database share a machine, so queries go over the loopback and nothing depends on
+# the tailnet path. The previous instance on the AI host still holds a copy of the
+# data as a rollback point.
+#
+# Installed by deploy/scripts/install.sh into ~/.config/containers/systemd/.
+
+[Unit]
+Description=work-report PostgreSQL 18
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=docker.io/library/postgres:18-alpine
+ContainerName=work-report-db
+# Loopback only: the app container uses host networking, so 127.0.0.1 is enough and
+# the database is never reachable from the LAN or the tailnet directly.
+PublishPort=127.0.0.1:5433:5432
+EnvironmentFile=%h/.config/work-report/db.env
+Volume=work-report-db-data.volume:/var/lib/postgresql:Z
+HealthCmd=["pg_isready","-U","work_report","-d","work_report"]
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=20s
+HealthOnFailure=restart
+LogDriver=journald
+AutoUpdate=local
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

@@ -1,7 +1,9 @@
 # Performance
 
-Measured on the production host (egg), the container built from `deploy/Containerfile`,
-PostgreSQL 18 on the AI host reached over the tailnet with TLS.
+Measured on the production host (egg), the container built from `deploy/Containerfile`.
+The dates matter: the numbers in the last section were taken while PostgreSQL was on
+the AI host and reached over the tailnet; the database now runs on this host, and the
+difference is the whole story of this document.
 
 ## Method
 
@@ -14,16 +16,19 @@ i.e. without the `tailscale serve` hop.
 
 ## Results
 
-| Endpoint | First request | Steady state |
-|---|---|---|
-| `/report/board` (25 cards, 4 columns) | 1.2 s | 0.44 – 0.50 s |
-| `/report/list` | 0.6 s | 0.44 – 0.50 s |
-| `/report/daily` | 0.6 s | 0.44 – 0.47 s |
-| `/report/export.xlsx` | 1.5 s | 1.30 – 1.35 s |
+Current (database local, loopback):
 
-Before the optimisations below, the same numbers were 1.9 s / 0.6 s / 0.6 s / 1.4 s.
-The first request after a boot is slower because php-fpm has to warm up and the
-persistent connection is created.
+| Endpoint | Steady state |
+|---|---|
+| `/report/board` (26 cards, 4 columns) | **0.09 – 0.12 s** |
+| `/report/list` | 0.10 – 0.12 s |
+| `/report/daily` | 0.09 – 0.11 s |
+| `/report/export.xlsx` | **0.29 – 0.31 s** |
+
+For comparison, with the database on the AI host over the tailnet the same endpoints
+measured 0.44–0.50 s and 1.30–1.35 s, and before any optimisation 1.9 s / 0.6 s /
+0.6 s / 1.4 s. Moving the cluster onto this host is the single largest improvement;
+everything else below is a smaller multiplier on top of it.
 
 ## What the profile said
 
@@ -64,7 +69,29 @@ Two findings:
 | Sessions and cache in PostgreSQL | rootfs stays read-only; one dependency fewer |
 | Static assets with a content hash + 30-day cache | assets downloaded once per deploy |
 
-## Known bottleneck: packet loss on the tailnet path
+## Export: where the time went
+
+A 25-row export measured end to end, with the database already local:
+
+```
+queries + models:      44 ms
+sheet writing:        965 ms   <- PhpSpreadsheet style calls
+xlsx write + repair:   45 ms
+```
+
+PhpSpreadsheet's `getStyle()` copies a `Style` object for **every cell in the range**
+it is handed. The detail block was styled cell by cell (61 rows × 13 columns, ~800
+`getStyle()` calls), and `setConditionalStyles()` re-copied the whole 732-cell
+`B16:M76` array once per rule. Both were rewritten to work per property:
+
+| Before | After |
+|---|---|
+| per cell, inside a 61-row loop | one `getStyle()` per column range |
+| `getStyle`/`setConditionalStyles` per rule | rules collected, applied once per range |
+
+Sheet writing: **965 ms → 225 ms**. Full export: **1.05 s → 0.36 s** of work.
+
+## Known bottleneck: packet loss on the tailnet path (resolved)
 
 `ping 100.101.146.117` from the application host reports **~35 % packet loss** with
 6–8 ms RTT, and `tailscale netcheck` shows the path is being relayed through the
@@ -72,16 +99,14 @@ Tokyo DERP rather than a direct connection. Every extra round trip therefore cos
 far more than its nominal latency, which is why a page with five queries takes
 0.45 s rather than 0.05 s.
 
-This is a network property, not application time: a single `psql` round trip from
-the same host measures 5–9 ms once established. If it becomes a problem, the
-remedies in order of cost are:
+This was a network property, not application time: a single `psql` round trip from
+the same host measured 5–9 ms once established, but a page needs five of them.
 
-1. Get a direct path between the two tailnet nodes (UDP 41641 reachable on both
-   sides) — no code change at all.
-2. Move PostgreSQL onto the application host and connect over the loopback socket
-   (`DB_HOST=/var/run/postgresql`), which removes the network from the query path
-   entirely. Only `.env`/`~/.config/work-report/env` changes; the schema, models
-   and queries are unaffected.
+**Resolved by taking option 2**: the cluster now runs on this host as the
+`work-report-db` Quadlet unit and the application connects over the loopback. No
+code changed — `DB_HOST`/`DB_PORT`/`DB_SSLMODE` in `~/.config/work-report/env`, and
+the board went from 0.45 s to 0.09 s. The remote instance still holds a copy as a
+rollback point (docs/deploy.md).
 
 ## Export cost
 
