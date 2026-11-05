@@ -4,64 +4,10 @@
    product, plus a Jira-like density for the board. */
 
 :root {
-    --navy: #1f3864;
-    --blue: #2f5597;
-    --blue-600: #2b4c86;
-    --blue-050: #eef3fb;
-    --hair: #dfe4ec;
-    --hair-strong: #bfc9d9;
-    --ink: #1b2431;
-    --ink-2: #46536b;
-    --muted: #6b7788;
-    --faint: #98a2b3;
-    --bg: #f4f6fa;
-    --surface: #ffffff;
-    --zebra: #f7f9fc;
-    --green: #2f7a4d;
-    --green-bg: #e7f4ec;
-    --amber: #a56a00;
-    --amber-bg: #fdf3e2;
-    --red: #b3261e;
-    --red-bg: #fceceb;
-    --slate-bg: #eef1f5;
-    --radius: 8px;
-    --radius-sm: 5px;
-    --shadow-1: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
-    --shadow-2: 0 4px 8px -2px rgba(16, 24, 40, .1), 0 2px 4px -2px rgba(16, 24, 40, .06);
-    --shadow-3: 0 12px 32px -8px rgba(16, 24, 40, .24);
+    /* Tokens live in public/assets/theme.css (docs/design-system.md). Only the two
+       measurements that belong to this layout are declared here. */
     --header-h: 52px;
     --sidebar-w: 232px;
-    --font: "Pretendard", "Malgun Gothic", "맑은 고딕", -apple-system, BlinkMacSystemFont,
-        "Segoe UI", "Noto Sans KR", Roboto, sans-serif;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --navy: #c9d8f5;
-        --blue: #7ea6ea;
-        --blue-600: #6d97e0;
-        --blue-050: #1a2436;
-        --hair: #26303f;
-        --hair-strong: #35415422;
-        --ink: #e6ebf3;
-        --ink-2: #b6c0d0;
-        --muted: #8b97a9;
-        --faint: #6d7889;
-        --bg: #0f1319;
-        --surface: #161b23;
-        --zebra: #1a2028;
-        --green: #6cc48f;
-        --green-bg: #12261a;
-        --amber: #e0ac52;
-        --amber-bg: #2a2011;
-        --red: #f0837a;
-        --red-bg: #2c1615;
-        --slate-bg: #1e242e;
-        --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
-        --shadow-2: 0 4px 10px -2px rgba(0, 0, 0, .5);
-        --shadow-3: 0 16px 40px -12px rgba(0, 0, 0, .7);
-    }
 }
 
 [x-cloak] { display: none !important; }
@@ -1024,3 +970,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .doc-grid--read .card { max-width: 980px; }
 .doc-read__title { font-size: 20px; font-weight: 700; margin: 2px 0 14px; letter-spacing: -.01em; }
 @media (max-width: 1180px) { .doc-grid--read { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── Theme toggle (docs/design-system.md) ───────────────────────────────────── */
+.theme-toggle {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--ink-2);
+}
+.theme-toggle:hover { color: var(--ink); }

@@ -136,6 +136,7 @@ return [
         'sign_in_again' => 'もう一度ログイン',
     ],
     'common' => [
+        'theme' => 'テーマ（自動/ライト/ダーク）',
         'save' => '保存',
         'cancel' => 'キャンセル',
         'delete' => '削除',

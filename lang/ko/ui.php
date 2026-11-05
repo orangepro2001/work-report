@@ -146,6 +146,7 @@ return [
     ],
 
     'common' => [
+        'theme' => '테마 (자동/밝게/어둡게)',
         'save' => '저장',
         'cancel' => '취소',
         'delete' => '삭제',

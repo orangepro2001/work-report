@@ -6,6 +6,20 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="light dark">
     <title>@yield('title', __('ui.app.name')) · {{ __('ui.app.name') }}</title>
+    {{-- Shared design tokens (docs/design-system.md); the same file is vendored into
+         the SSO console, so both apps draw from one palette. --}}
+    <link rel="stylesheet" href="{{ wr_asset('assets/theme.css') }}?v={{ substr(md5_file(public_path('assets/theme.css')), 0, 8) }}">
+    <script>
+        // Apply the stored theme before first paint (auto / light / dark).
+        (function () {
+            try {
+                var stored = localStorage.getItem('wr-theme');
+                if (stored === 'light' || stored === 'dark') {
+                    document.documentElement.dataset.theme = stored;
+                }
+            } catch (e) {}
+        })();
+    </script>
     <link rel="stylesheet" href="{{ wr_asset('assets/vendor/fontawesome/fontawesome.min.css') }}">
     <link rel="stylesheet" href="{{ wr_asset('assets/vendor/fontawesome/solid.min.css') }}">
     <link rel="stylesheet" href="{{ wr_asset('assets/vendor/easymde/easymde.min.css') }}?v={{ substr(md5_file(public_path('assets/vendor/easymde/easymde.min.css')), 0, 8) }}">
@@ -46,6 +60,9 @@
         </form>
 
         <div class="topbar__spacer"></div>
+
+        <button class="btn btn--ghost btn--icon theme-toggle" type="button" data-theme-toggle
+                title="{{ __('ui.common.theme') }}" aria-label="{{ __('ui.common.theme') }}">◐</button>
 
         @include('partials.identity')
 
@@ -452,6 +469,36 @@ window.initMarkdownEditors = function (root) {
     });
 };
 
+</script>
+<script>
+/* Theme toggle contract (docs/design-system.md): auto → light → dark → auto. */
+(function () {
+    var button = document.querySelector('[data-theme-toggle]');
+    if (!button) return;
+
+    var order = ['auto', 'light', 'dark'];
+    var label = { auto: '◐', light: '☀', dark: '☾' };
+
+    function current() {
+        try { return localStorage.getItem('wr-theme') || 'auto'; } catch (e) { return 'auto'; }
+    }
+
+    function apply(theme) {
+        if (theme === 'auto') {
+            delete document.documentElement.dataset.theme;
+            try { localStorage.removeItem('wr-theme'); } catch (e) {}
+        } else {
+            document.documentElement.dataset.theme = theme;
+            try { localStorage.setItem('wr-theme', theme); } catch (e) {}
+        }
+        button.textContent = label[theme];
+    }
+
+    button.textContent = label[current()];
+    button.addEventListener('click', function () {
+        apply(order[(order.indexOf(current()) + 1) % order.length]);
+    });
+})();
 </script>
 @stack('scripts')
 </body>

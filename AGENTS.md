@@ -34,8 +34,10 @@ gets into it. Read these before touching anything:
    in a `node` stage of `deploy/Containerfile`; vendoring such a graph by hand is
    what this note exists to prevent. This is why the
    image is small and the deploy is a copy.
-5. **Palette literals live in `ReportSheetWriter`.** If a colour is needed
-   somewhere else, reference the constant, do not retype the hex.
+5. **Palette literals live in two places, and only two.** The Excel palette is in
+   `ReportSheetWriter` (reference the constant, never retype the hex); the UI palette
+   is `public/assets/theme.css` (`docs/design-system.md`), which the SSO console
+   copies verbatim. A new UI colour literal anywhere else is a bug.
 
 ## The Excel exporter, in one paragraph
 

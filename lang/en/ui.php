@@ -137,6 +137,7 @@ return [
         'sign_in_again' => 'Sign in again',
     ],
     'common' => [
+        'theme' => 'Theme (auto / light / dark)',
         'save' => 'Save',
         'cancel' => 'Cancel',
         'delete' => 'Delete',
