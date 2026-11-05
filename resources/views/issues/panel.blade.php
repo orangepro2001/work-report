@@ -71,7 +71,13 @@
         <dd class="tiny muted">{{ $issue->coAssignees->pluck('name')->implode(', ') ?: '—' }}</dd>
 
         <dt>{{ __('ui.issue.reporter') }}</dt>
-        <dd class="tiny">{{ $issue->reporter?->name ?? '—' }}</dd>
+        <dd>
+            <select class="select" style="height:26px;font-size:12.5px" x-on:change="save('reporter_id', $el.value || null)">
+                @foreach ($members as $member)
+                    <option value="{{ $member->id }}" @selected($issue->reporter_id === $member->id)>{{ $member->name }}</option>
+                @endforeach
+            </select>
+        </dd>
 
         <dt>{{ __('ui.issue.starts') }}</dt>
         <dd><input class="input" style="height:26px;font-size:12.5px" type="date"

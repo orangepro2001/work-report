@@ -26,10 +26,13 @@ gets into it. Read these before touching anything:
    `COUNTIFS` formula renumbers; that is exactly what we do not do.
 3. **Formulas stay formulas in the export.** `B`, `C`, `O` and the whole summary
    block are written as formula strings so Excel recalculates after an edit.
-4. **Do not add a build step.** No Vite, no Tailwind, no npm. The CSS is
-   hand-written in `public/assets/app.css`; Alpine, EasyMDE and the Font Awesome
-   solid icons are vendored under `public/assets/vendor/` (copy the dist file in,
-   never a CDN link — the board runs on a tailnet with no internet). This is why the
+4. **Prefer no build step, but it is not a rule.** The CSS is hand-written in
+   `public/assets/app.css`; Alpine, EasyMDE and the Font Awesome solid icons are
+   vendored under `public/assets/vendor/` (copy the dist file in, never a CDN link
+   — the board runs on a tailnet with no internet). A JS dependency that only ships
+   as a module graph (the Yjs collaboration client) may be built with npm + esbuild
+   in a `node` stage of `deploy/Containerfile`; vendoring such a graph by hand is
+   what this note exists to prevent. This is why the
    image is small and the deploy is a copy.
 5. **Palette literals live in `ReportSheetWriter`.** If a colour is needed
    somewhere else, reference the constant, do not retype the hex.

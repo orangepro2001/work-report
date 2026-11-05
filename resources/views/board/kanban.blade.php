@@ -5,7 +5,7 @@
 
 <div class="board" x-data="board()" x-cloak>
     @foreach ($columns as $column)
-        <section class="column" aria-label="{{ $column['label'] }}">
+        <section class="column column--{{ $column['key'] }}" aria-label="{{ $column['label'] }}">
             <div class="column__head">
                 <span class="chip chip--{{ $column['tone'] }}">{{ $column['label'] }}</span>
                 <span class="column__count">{{ $column['count'] }}</span>

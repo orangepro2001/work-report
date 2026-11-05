@@ -346,6 +346,20 @@ class IssueCollaborationTest extends TestCase
             ->assertSessionHas('status', __('ui.identity.unreachable'));
     }
 
+    public function test_the_reporter_can_be_changed(): void
+    {
+        $issue = Issue::firstOrFail();
+        $other = Member::whereKeyNot($issue->reporter_id)->firstOrFail();
+
+        $json = $this->patchJson("/issues/{$issue->id}", ['reporter_id' => $other->id])
+            ->assertOk()->json();
+
+        $this->assertSame($other->id, $issue->fresh()->reporter_id);
+        $this->assertSame($other->id, $json['issue']['reporter_id']);
+        // The timeline says what happened, in words, not "reporter_id changed".
+        $this->assertStringContainsString(__('activity.reported_by_changed'), $json['activity']);
+    }
+
     public function test_validation_rejects_an_unknown_status(): void
     {
         $issue = Issue::firstOrFail();

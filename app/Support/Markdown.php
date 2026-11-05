@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Support\Markdown\ImageGuardExtension;
 use App\Support\Markdown\MentionsExtension;
+use App\Support\Markdown\Tasks\TasksExtension;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\Autolink\AutolinkExtension;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
@@ -20,6 +22,7 @@ use League\CommonMark\MarkdownConverter;
  *
  *   html_input=escape       raw HTML in a comment is shown as text, never rendered
  *   allow_unsafe_links=false  javascript:, data: and file: links are dropped
+ *   images                     only this application's own uploads may render
  *
  * `escape` rather than `strip`: stripping deleted everything in the same line as
  * the tag (CommonMark treats a leading `<script>` as a block spanning the line),
@@ -63,6 +66,8 @@ final class Markdown
         $environment->addExtension(new AutolinkExtension);
         $environment->addExtension(new TaskListExtension);
         $environment->addExtension(new MentionsExtension);
+        $environment->addExtension(new ImageGuardExtension);
+        $environment->addExtension(new TasksExtension);
 
         return $environment;
     }

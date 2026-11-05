@@ -926,3 +926,78 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .EasyMDEContainer .editor-statusbar { color: var(--faint); font-size: 11px; }
 .EasyMDEContainer .editor-toolbar, .EasyMDEContainer .CodeMirror, .EasyMDEContainer .editor-preview { z-index: 1; }
+
+/* ── State at a glance ────────────────────────────────────────────────────────
+   The drawer edits one issue; the board behind it has to show the consequence
+   immediately (the layout refreshes the live region after each save). These rules
+   make the *state* of a card or a row readable at a glance instead of a word. */
+
+/* Columns: a colour strip in the status tone, and a count that reads as a number. */
+.column__head { border-top: 3px solid transparent; padding-top: 8px; }
+.column--planned .column__head { border-top-color: var(--faint); }
+.column--in_progress .column__head { border-top-color: var(--blue); }
+.column--done .column__head { border-top-color: var(--green); }
+.column--on_hold .column__head { border-top-color: var(--amber); }
+.column--done .column__body { background: color-mix(in srgb, var(--green-bg) 40%, transparent); }
+.column__count {
+    min-width: 22px; text-align: center; font-weight: 700; color: var(--ink);
+    background: var(--slate-bg); border-radius: 999px; padding: 1px 7px;
+}
+.column--in_progress .column__count { background: var(--blue-050); color: var(--blue); }
+.column--done .column__count { background: var(--green-bg); color: var(--green); }
+.column--on_hold .column__count { background: var(--amber-bg); color: var(--amber); }
+
+/* Cards: finished work steps back, running work keeps its accent. */
+.card[data-status="done"] { opacity: .62; }
+.card[data-status="done"] .card__summary { text-decoration: line-through; text-decoration-color: var(--hair-strong); }
+.card[data-status="done"] .key::after { content: " ✓"; color: var(--green); font-weight: 700; }
+.card[data-status="in_progress"] { box-shadow: inset 3px 0 0 var(--blue), var(--shadow-1); }
+
+/* List rows: a status edge and a progress bar, so a scan finds 상태 without reading. */
+.grid tbody tr.row { box-shadow: inset 3px 0 0 transparent; }
+.grid tbody tr.row--planned { box-shadow: inset 3px 0 0 var(--faint); }
+.grid tbody tr.row--in_progress { box-shadow: inset 3px 0 0 var(--blue); }
+.grid tbody tr.row--done { box-shadow: inset 3px 0 0 var(--green); }
+.grid tbody tr.row--on_hold { box-shadow: inset 3px 0 0 var(--amber); }
+.grid tbody tr.row--late { box-shadow: inset 3px 0 0 var(--red); }
+.grid tbody tr.row--done td { color: var(--muted); }
+.grid tbody tr.row--done .summary-cell { text-decoration: line-through; text-decoration-color: var(--hair-strong); }
+.row__bar {
+    display: block; height: 3px; margin-top: 3px; border-radius: 2px; background: var(--hair); overflow: hidden;
+}
+.row__bar > i { display: block; height: 100%; background: var(--blue); }
+.grid tbody tr.row--done .row__bar > i { background: var(--green); }
+
+/* The item that just changed: impossible to miss for a second and a half. */
+.is-flash { animation: wr-flash 1.6s ease-out; }
+@keyframes wr-flash {
+    0%   { box-shadow: 0 0 0 3px var(--blue), var(--shadow-2); background-color: var(--blue-050); }
+    60%  { box-shadow: 0 0 0 3px transparent, var(--shadow-1); }
+    100% { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .is-flash { animation: none; outline: 2px solid var(--blue); outline-offset: 2px; }
+}
+
+/* 일보 grid: completed rows recede, late rows shout. */
+.report tbody tr.is-done td, .grid.report tbody tr.is-done td { color: var(--muted); }
+.report tbody tr.is-done .summary-cell { text-decoration: line-through; text-decoration-color: var(--hair-strong); }
+.report tbody tr.is-late td { background: color-mix(in srgb, var(--red-bg) 55%, transparent); }
+
+/* ── tasks block (a to-do table inside a document) ─────────────────────────────
+   Rendered by app/Support/Markdown/Tasks; a linked row opens the issue drawer, so
+   the document shows the board's own state rather than a stale copy. */
+.tasks { margin: 12px 0; border: 1px solid var(--hair); border-radius: var(--radius); overflow: hidden; }
+.tasks__head {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    background: var(--zebra); border-bottom: 1px solid var(--hair);
+}
+.tasks__title { font-weight: 700; font-size: 12.5px; }
+.tasks__count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tasks__meter { flex: 1; height: 6px; border-radius: 999px; background: var(--hair); overflow: hidden; }
+.tasks__meter > i { display: block; height: 100%; background: var(--green); border-radius: 999px; }
+.tasks__percent { font-size: 11px; color: var(--green); font-weight: 650; white-space: nowrap; }
+.tasks .grid { border: 0; box-shadow: none; }
+.tasks .grid th { background: var(--surface); }
+.tasks .grid td { padding-top: 6px; padding-bottom: 6px; }
+.tasks .key { color: var(--blue); }

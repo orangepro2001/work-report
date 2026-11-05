@@ -45,7 +45,7 @@ class DailyReportController extends Controller
             ? DailyLog::where('log_date', $date->toDateString())->where('member_id', $selectedMember)->first()
             : null;
 
-        return view('report.daily', [
+        $view = view('report.daily', [
             'date' => $date,
             'member' => $member,
             'members' => Member::active()->get(['id', 'name', 'color']),
@@ -55,6 +55,8 @@ class DailyReportController extends Controller
             'stats' => $this->stats($issues, $date),
             'buckets' => config('workreport.summary_buckets'),
         ]);
+
+        return $request->header('X-Live-Region') === 'daily' ? $view->fragment('daily') : $view;
     }
 
     /**

@@ -56,7 +56,7 @@ class BoardController extends Controller
 
         $issues = $query->get();
 
-        return view('board.index', [
+        $view = view('board.index', [
             'lens' => $lens,
             'filters' => $filters,
             'projects' => $projects,
@@ -67,6 +67,11 @@ class BoardController extends Controller
             'issues' => $issues,
             'sprints' => Sprint::where('state', '!=', 'closed')->orderByDesc('id')->get(['id', 'name', 'state', 'project_id']),
         ]);
+
+        // The drawer asks for this region after every save, so the card can move
+        // column, the counters can change and the list row can restyle without a
+        // page reload — and still be rendered by Blade, not by JavaScript.
+        return $request->header('X-Live-Region') === 'board' ? $view->fragment('board') : $view;
     }
 
     /** @return array<string,mixed> */

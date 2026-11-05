@@ -30,7 +30,9 @@
             </thead>
             <tbody>
             @foreach ($issues as $i => $issue)
-                <tr x-on:click="$dispatch('open-issue', { url: '{{ route('issues.show', $issue) }}' })">
+                <tr class="row row--{{ $issue->status_key }} {{ $isLate($issue) ? 'row--late' : '' }}"
+                    data-issue-id="{{ $issue->id }}" data-status="{{ $issue->status_key }}"
+                    x-on:click="$dispatch('open-issue', { url: '{{ route('issues.show', $issue) }}' })">
                     <td class="num muted tnum">{{ $i + 1 }}</td>
                     <td><span class="key">{{ $issue->issue_key }}</span></td>
                     <td class="summary-cell" title="{{ $issue->summary }}">{{ $issue->summary }}</td>
@@ -53,7 +55,10 @@
                             {{ $statusByKey[$issue->status_key]['label'] ?? $issue->status_key }}
                         </span>
                     </td>
-                    <td class="num tnum" style="font-weight:650">{{ $issue->effectivePercent() }}%</td>
+                    <td class="num tnum" style="font-weight:650">
+                        {{ $issue->effectivePercent() }}%
+                        <span class="row__bar" aria-hidden="true"><i style="width: {{ $issue->effectivePercent() }}%"></i></span>
+                    </td>
                     <td class="num tnum muted">{{ $issue->starts_on?->format('m/d') ?? '—' }}</td>
                     <td class="num tnum {{ $isLate($issue) ? 'nowrap' : 'muted' }}"
                         style="{{ $isLate($issue) ? 'color:var(--red);font-weight:650' : '' }}">

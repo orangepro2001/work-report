@@ -26,7 +26,12 @@ EnvironmentFile=%h/.config/work-report/env
 
 # The rootfs is read-only: Laravel writes compiled views/config and sessions into
 # tmpfs, and nothing else may be written inside the container.
+#
+# storage/app is the one exception and it is a *volume*, not tmpfs: it holds uploaded
+# images (docs/documents.md). Files put there must survive a restart, a rebuild and
+# an upgrade — a tmpfs would silently lose every picture in the documents.
 ReadOnly=true
+Volume=work-report-storage.volume:/app/storage/app:Z,U
 Tmpfs=/tmp
 Tmpfs=/app/storage/framework/views:size=64m,mode=0777
 Tmpfs=/app/storage/framework/cache:size=32m,mode=0777

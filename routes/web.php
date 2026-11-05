@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\DailyReportController;
+use App\Http\Controllers\DocumentsController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\MarkdownPreviewController;
 use App\Http\Controllers\SsoAuthController;
+use App\Http\Controllers\UploadController;
 use App\Http\Middleware\ForceMountPath;
 use App\Http\Middleware\RequireActor;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,21 @@ Route::middleware(RequireActor::class)->group(function () {
 
     // Excel export.
     Route::get('/export.xlsx', ExportController::class)->name('export');
+
+    // Document library (docs/documents.md): an internal assets shelf, not a wiki engine.
+    Route::get('/docs', [DocumentsController::class, 'index'])->name('docs.index');
+    Route::post('/docs', [DocumentsController::class, 'store'])->name('docs.store');
+    Route::get('/docs/{document:slug}', [DocumentsController::class, 'show'])->name('docs.show');
+    Route::patch('/docs/{document:slug}', [DocumentsController::class, 'update'])->name('docs.update');
+    Route::get('/docs/{document:slug}/state', [DocumentsController::class, 'state'])->name('docs.state');
+    Route::post('/docs/{document:slug}/restore/{revision}', [DocumentsController::class, 'restore'])->name('docs.restore');
+    Route::post('/docs/{document:slug}/share', [DocumentsController::class, 'share'])->name('docs.share');
+    Route::delete('/docs/{document:slug}/share/{member}', [DocumentsController::class, 'unshare'])->name('docs.unshare');
+
+    // Images for Markdown: stored on this host, served through the app so a private
+    // document's pictures stay private (docs/documents.md).
+    Route::post('/uploads', [UploadController::class, 'store'])->name('uploads.store');
+    Route::get('/uploads/{attachment}', [UploadController::class, 'show'])->name('uploads.show');
 
     // The editor's preview pane, rendered by the same class that renders saved
     // comments (app/Support/Markdown.php).

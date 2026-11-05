@@ -245,6 +245,12 @@ function issuePanel(issueId, initial) {
                 const selected = document.querySelector('#p-status option:checked');
                 if (selected) this.statusLabel = selected.textContent;
             }
+
+            // The description has no footprint on the board; everything else does.
+            if (field !== 'description') {
+                window.refreshLiveRegion(issueId);
+            }
+
             this.$dispatch('toast', { message: '{{ __('ui.issue.saved') }}' });
         },
 
@@ -285,6 +291,42 @@ function issuePanel(issueId, initial) {
 }
 
 /*
+ * Re-renders the page's live region (the board, the list, or the 일보 grid).
+ *
+ * Not a client-side patch: the drawer changes one issue, and everything the change
+ * touches — the card's column, three counters, a summary row, a table row — is
+ * produced by re-running the same Blade the first render used. One request per
+ * save, no second renderer to keep in sync.
+ */
+window.refreshLiveRegion = async function (changedIssueId) {
+    const region = document.querySelector('[data-live]');
+    if (!region) return;
+
+    const res = await fetch(window.location.href, {
+        headers: {
+            'X-Live-Region': region.dataset.live,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html',
+        },
+        credentials: 'same-origin',
+    });
+
+    if (!res.ok) return;
+
+    region.innerHTML = await res.text();
+    window.Alpine && window.Alpine.initTree(region);
+
+    // Show *what* moved: the changed item gets a short highlight, and the board is
+    // scrolled to it when the change moved it to another column.
+    const target = region.querySelector('[data-issue-id="' + changedIssueId + '"]');
+    if (target) {
+        target.classList.add('is-flash');
+        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        setTimeout(() => target.classList.remove('is-flash'), 1600);
+    }
+};
+
+/*
  * Builds a Markdown editor on every textarea[data-markdown] inside root.
  *
  * EasyMDE and Font Awesome are vendored under public/assets/vendor — no build
@@ -299,14 +341,65 @@ window.initMarkdownEditors = function (root) {
         if (el.dataset.mdeReady === '1') return;
         el.dataset.mdeReady = '1';
 
+        // Images never leave this host: EasyMDE hands the file to our own endpoint,
+        // which answers with the URL of a file served through /uploads/{id}. The
+        // renderer refuses anything else (app/Support/Markdown/ImageGuardProcessor.php).
+        const uploadImage = (file, onSuccess, onError) => {
+            const data = new FormData();
+            data.append('file', file);
+            if (el.dataset.documentId) data.append('document', el.dataset.documentId);
+            if (el.dataset.issueId) data.append('issue', el.dataset.issueId);
+
+            fetch('{{ route('uploads.store') }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                },
+                body: data,
+            })
+                .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.status))))
+                .then((json) => onSuccess(json.url))
+                .catch(() => onError('이미지를 올리지 못했습니다'));
+        };
+
         const editor = new window.EasyMDE({
             element: el,
             autoDownloadFontAwesome: false,
             spellChecker: false,
             status: false,
             minHeight: '110px',
+            uploadImage: true,
+            imageAccept: 'image/png,image/jpeg,image/webp,image/gif,image/avif',
+            imageMaxSize: 12 * 1024 * 1024,
+            imageUploadFunction: uploadImage,
+            imageTexts: {
+                sbInit: '이미지를 끌어다 놓거나 붙여넣으세요 (이 서버에 저장됩니다)',
+                sbOnDragEnter: '놓으면 업로드합니다',
+                sbOnDrop: '업로드 중…',
+                sbProgress: '업로드 중… (#file_progress#)',
+                sbOnUploaded: '업로드 완료',
+                sizeUnits: ' KB, MB',
+            },
             placeholder: el.getAttribute('placeholder') || '',
-            toolbar: ['bold', 'italic', 'strikethrough', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', 'code', 'table', '|', 'preview', 'side-by-side', 'guide'],
+            toolbar: [
+                'bold', 'italic', 'strikethrough', 'heading', '|',
+                'quote', 'unordered-list', 'ordered-list', '|',
+                'link', 'image', 'code', 'table', '|',
+                {
+                    // The tasks block (app/Support/Markdown/Tasks) is this project's
+                    // own syntax, so it gets its own button instead of a hidden rule.
+                    name: 'tasks',
+                    action: (editor) => {
+                        editor.codemirror.replaceSelection('```tasks\n\n```');
+                        editor.codemirror.setCursor({ line: editor.codemirror.getCursor().line - 2, ch: 0 });
+                        editor.codemirror.focus();
+                    },
+                    className: 'fa fa-list-check',
+                    title: '할 일 목록 (issue 키 또는 "제목 | 우선순위 | 진행률 | 상태")',
+                },
+                '|', 'preview', 'side-by-side', 'guide',
+            ],
             previewRender: (plainText) => {
                 // EasyMDE wants a string; the server's answer replaces the pane once
                 // it arrives, so the preview never renders anything unsanitised.

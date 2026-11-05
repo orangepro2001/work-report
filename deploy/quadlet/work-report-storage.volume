@@ -1,0 +1,3 @@
+# Uploaded files (document images, docs/documents.md). Named, so it outlives the
+# container and every image rebuild.
+[Volume]

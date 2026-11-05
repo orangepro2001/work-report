@@ -67,10 +67,13 @@ render_quadlet() {
         "$WRP_SRC/deploy/quadlet/work-report-db.container" > "$QUADLET_DIR/$WRP_NAME-db.container"
     sed -e "s/work-report-db-data/$WRP_NAME-db-data/g" \
         "$WRP_SRC/deploy/quadlet/work-report-db-data.volume" > "$QUADLET_DIR/$WRP_NAME-db-data.volume"
+    sed -e "s/work-report-storage/$WRP_NAME-storage/g" \
+        "$WRP_SRC/deploy/quadlet/work-report-storage.volume" > "$QUADLET_DIR/$WRP_NAME-storage.volume"
 
     sed -e "s/work-report-env/$WRP_NAME-env/g" \
         -e "s/ContainerName=work-report/ContainerName=$WRP_NAME/" \
         -e "s#localhost/work-report:current#$WRP_IMAGE:current#" \
+        -e "s/work-report-storage/$WRP_NAME-storage/g" \
         -e "s/0.0.0.0:3560/0.0.0.0:$WRP_PORT/" \
         -e "s#%h/.config/work-report/env#%h/.config/$WRP_NAME/env#" \
         -e "s/systemd-\(.*\)-work-report/systemd-\1-$WRP_NAME/" \

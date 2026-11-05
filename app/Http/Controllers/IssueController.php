@@ -124,6 +124,7 @@ class IssueController extends Controller
             'status_key' => ['sometimes', Rule::in(array_column(config('workreport.statuses'), 'key'))],
             'percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'assignee_id' => ['sometimes', 'nullable', 'integer', 'exists:members,id'],
+            'reporter_id' => ['sometimes', 'nullable', 'integer', 'exists:members,id'],
             'starts_on' => ['sometimes', 'nullable', 'date'],
             'due_on' => ['sometimes', 'nullable', 'date'],
             'due_undecided' => ['sometimes', 'boolean'],
@@ -323,6 +324,9 @@ class IssueController extends Controller
         if (isset($changes['assignee_id'])) {
             return 'assigned';
         }
+        if (isset($changes['reporter_id'])) {
+            return 'reported_by_changed';
+        }
 
         return 'updated';
     }
@@ -352,6 +356,8 @@ class IssueController extends Controller
             'due_undecided' => $issue->due_undecided,
             'project' => $issue->project?->only(['id', 'name', 'abbr', 'color']),
             'assignees' => $issue->allAssigneeNames(),
+            'reporter_id' => $issue->reporter_id,
+            'assignee_id' => $issue->assignee_id,
             'assignee_color' => $issue->assignee?->color,
             'board_rank' => (float) $issue->board_rank,
         ];

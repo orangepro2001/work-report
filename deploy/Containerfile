@@ -4,8 +4,9 @@
 #
 #   podman build -f deploy/Containerfile -t localhost/work-report:current .
 #
-# No Node stage: the UI is hand-written CSS plus a locally vendored Alpine build,
-# so nothing has to be compiled at build time and the image stays tiny.
+# Node appears in a build stage only, for assets that cannot be vendored as a single
+# file (the Yjs collaboration client). The runtime image stays PHP + nginx: the
+# bundle is copied in, and `node_modules` never reaches it.
 ARG PHP_VERSION=8.4
 
 ###############################################################################

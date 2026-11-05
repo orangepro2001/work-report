@@ -5,13 +5,20 @@
 @section('content')
     @include('board.toolbar')
 
-    @if ($lens === 'board')
-        @include('board.kanban')
-    @elseif ($lens === 'list')
-        @include('board.list')
-    @else
-        @include('board.backlog')
-    @endif
+    {{-- The drawer re-fetches this region after every save (X-Live-Region: board),
+         so a status change moves the card/row and updates the counters at once —
+         still rendered by Blade, never by a second renderer in JavaScript. --}}
+    <div data-live="board">
+        @fragment('board')
+            @if ($lens === 'board')
+                @include('board.kanban')
+            @elseif ($lens === 'list')
+                @include('board.list')
+            @else
+                @include('board.backlog')
+            @endif
+        @endfragment
+    </div>
 
     @include('issues.create-modal')
 @endsection

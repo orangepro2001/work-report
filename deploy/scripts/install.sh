@@ -38,6 +38,12 @@ if ! podman volume exists "$WRP_NAME-db-data"; then
     log "created volume $WRP_NAME-db-data (first boot initialises the cluster)"
 fi
 
+# Uploaded images live here; without the volume they would vanish with the container.
+if ! podman volume exists "$WRP_NAME-storage"; then
+    podman volume create "$WRP_NAME-storage" >/dev/null
+    log "created volume $WRP_NAME-storage (document images)"
+fi
+
 ver=$(src_version)
 build_image "$ver"
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
