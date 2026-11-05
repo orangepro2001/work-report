@@ -8,6 +8,7 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\IssueTodoController;
 use App\Http\Controllers\MarkdownPreviewController;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\SsoAuthController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\ForceMountPath;
@@ -53,6 +54,12 @@ Route::middleware(RequireActor::class)->group(function () {
 
     // Excel export.
     Route::get('/export.xlsx', ExportController::class)->name('export');
+
+    // The people the board attributes work to (app/Http/Controllers/MemberController).
+    Route::get('/members', [MemberController::class, 'index'])->name('members.index');
+    Route::post('/members', [MemberController::class, 'store'])->name('members.store');
+    Route::patch('/members/{member}', [MemberController::class, 'update'])->name('members.update');
+    Route::delete('/members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');
 
     // Document library (docs/documents.md): an internal assets shelf, not a wiki engine.
     Route::get('/docs', [DocumentsController::class, 'index'])->name('docs.index');

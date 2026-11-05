@@ -101,6 +101,41 @@ class Member extends Model
         return $key;
     }
 
+    /**
+     * Everything that would lose its meaning if this row disappeared.
+     *
+     * Most foreign keys pointing at members are `on delete set null`, so deleting a
+     * person silently erases who wrote a comment, who moved an issue, who reported it.
+     * The member page therefore refuses to delete anything with references and offers
+     * "deactivate" instead — inactive members vanish from the pickers and from the
+     * workbook's 담당자 요약 sheet while the history keeps its attribution.
+     */
+    public function referenceCount(): int
+    {
+        if ($this->getKey() === null) {
+            return 0;
+        }
+
+        return (int) $this->newQuery()->whereKey($this->getKey())->where(function ($outer) {
+            $outer
+                ->whereExists(fn ($q) => $q->selectRaw('1')->from('issues')->where('assignee_id', $this->id)->orWhere('reporter_id', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('issue_activities')->where('actor_id', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('issue_comments')->where('author_id', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('issue_todos')->where('assignee_id', $this->id)->orWhere('created_by', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('documents')->where('owner_id', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('document_revisions')->where('editor_id', $this->id))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('attachments')->where('uploader_id', $this->id));
+        })->exists() ? 1 : 0;
+    }
+
+    /** How many issues carry this member as assignee or reporter — for the member page. */
+    public function issueCount(): int
+    {
+        return (int) Issue::query()
+            ->where(fn ($q) => $q->where('assignee_id', $this->id)->orWhere('reporter_id', $this->id))
+            ->count();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('active', true)->orderBy('position')->orderBy('id');

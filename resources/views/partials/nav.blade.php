@@ -25,6 +25,9 @@
     <a class="nav__item {{ request()->routeIs('docs.*') ? 'is-active' : '' }}" href="{{ route('docs.index') }}">
         <span aria-hidden="true">▤</span> {{ __('ui.nav.docs') }}
     </a>
+    <a class="nav__item {{ request()->routeIs('members.*') ? 'is-active' : '' }}" href="{{ route('members.index') }}">
+        <span aria-hidden="true">◕</span> {{ __('ui.nav.members') }}
+    </a>
     <a class="nav__item" href="{{ route('export', array_filter(['date' => request('date')])) }}">
         <span aria-hidden="true">⤓</span> {{ __('ui.nav.export') }}
     </a>
