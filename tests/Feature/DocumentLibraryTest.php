@@ -170,13 +170,15 @@ class DocumentLibraryTest extends TestCase
         $this->assertStringContainsString('x-on:click="save(true)"', $html);
         $this->assertStringContainsString("saveState === 'saved'", $html);
 
-        // A preview column of its own, and translated labels — a missing lang key
-        // renders as "ui.docs.save_now" on the button, which is exactly what shipped
-        // once and must not ship again.
-        $this->assertStringContainsString('id="doc-preview"', $html);
+        // The editor renders as it is written (live preview in CodeMirror), so there
+        // is no second preview pane to keep in sync.
+        $this->assertStringContainsString('wrLivePreview', $html);
+        $this->assertStringNotContainsString('id="doc-preview"', $html);
+
+        // Translated labels — a missing lang key renders as "ui.docs.save_now" on the
+        // button, which is exactly what shipped once and must not ship again.
         $this->assertStringContainsString(__('ui.docs.save_now'), $html);
         $this->assertStringNotContainsString('ui.docs.save_now', $html);
-        $this->assertStringContainsString(__('ui.docs.preview'), $html);
     }
 
     public function test_the_editor_and_the_finished_document_toggle(): void

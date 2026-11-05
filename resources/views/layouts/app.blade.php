@@ -132,6 +132,9 @@
 </div>
 
 <script>
+// The team's names, for @mentions inside any Markdown editor on the page.
+window.WR_MENTIONS = {{ \Illuminate\Support\Js::from(\App\Models\Member::active()->internal()->orderBy('position')->pluck('name')) }};
+
 function app() {
     return {
         drawer: { open: false, html: '', key: '', busy: false, url: '', mode: 'modal' },
@@ -414,21 +417,35 @@ window.refreshLiveRegion = async function (changedIssueId) {
 };
 
 /*
- * Markdown live preview (Obsidian's behaviour, CodeMirror 5's primitives).
+ * Markdown live preview and editing ergonomics — the editor's final form.
  *
- * The text stays text — this never rewrites the document, so the Yjs binding and the
- * autosave see exactly what was typed. What changes is the *view*: syntax markers are
- * collapsed on every line except the one the caret is on, and an image becomes an
- * image. Click a line and its source comes back, which is the whole point: no mode to
- * switch, no preview pane to compare against.
+ * Everything here is *view-side* work on CodeMirror 5: the document text is never
+ * rewritten by the decoration pass, so autosave, the Yjs binding and the revision
+ * history see exactly what was typed. The one exception is the task checkbox, which
+ * the person clicks on purpose (it rewrites `[ ]` ⇄ `[x]`, two characters).
+ *
+ * Behaviour:
+ *   · tokens styled (headings, bold, italic, strike, links, quotes)
+ *   · syntax markers collapsed on every line except the caret's
+ *   · fenced code blocks read as blocks, images render inline
+ *   · task list boxes are real, clickable checkboxes
+ *   · Enter continues a list / task, and an empty item ends it
+ *   · Tab / Shift-Tab indent and outdent list items
+ *   · typing @ suggests the team
  */
 function wrLivePreview(editor) {
     const cm = editor.codemirror;
+    const suppress = { on: false };
+
     const MARKERS = [
-        /\*\*/g, /__/g, /~~/g, /`/g,                                   // emphasis and code fences
-        /^#{1,6}\s/g, /^>\s/g, /^[-*+]\s\[[ xX]\]\s/g,                  // heading, quote, task box
-        /\[(?=[^\]]*\]\()/g, /\]\([^)]*\)/g,                            // link syntax around its label
+        /\*\*|__|~~|`/g,               // emphasis and inline code
+        /^#{1,6}\s/g,                  // heading
+        /^>\s?/g,                      // blockquote
+        /^[-*+]\s/g, /^\d+[.)]\s/g,    // list bullets and numbers
+        /\[(?=[^\]]*\]\()/g, /\]\([^)]*\)/g,  // link syntax around its label
     ];
+
+    const TASK = /^(\s*)[-*+]\s\[([ xX])\]\s/;
 
     let marks = [];
     let pending = null;
@@ -438,35 +455,91 @@ function wrLivePreview(editor) {
         marks = [];
     }
 
-    function hideRange(line, from, to) {
-        if (to <= from) return;
-        marks.push(cm.markText({ line, ch: from }, { line, ch: to }, { className: 'cm-md-hidden' }));
+    /** Clickable checkbox: replaces the `[ ]` run on a line that is not being edited. */
+    function checkbox(line, from, checked) {
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = checked;
+        box.className = 'cm-md-task';
+        box.setAttribute('aria-label', checked ? 'done' : 'todo');
+        box.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const text = cm.getLine(line) || '';
+            const start = from - (checked ? 4 : 3);   // the bracket pair we marked
+            const replacement = checked ? '[ ]' : '[x]';
+            cm.replaceRange(replacement, { line, ch: start }, { line, ch: start + 3 });
+            cm.focus();
+            if (!text) return;
+        });
+
+        marks.push(cm.markText({ line, ch: from }, { line, ch: from + 3 }, {
+            replacedWith: box, clearOnEnter: false, handleMouseEvents: true,
+        }));
     }
 
     function decorate() {
         pending = null;
+        if (suppress.on) return;
         clear();
 
         const active = cm.getCursor().line;
         const viewport = cm.getViewport();
 
+        let fence = null;   // {line, marker}
+
         for (let ln = viewport.from; ln <= viewport.to; ln++) {
-            // The line being edited keeps its syntax: that is where you type it.
-            if (ln === active) continue;
+            const text = cm.getLine(ln) || '';
+            const trimmed = text.trimStart();
 
-            const text = cm.getLine(ln);
-            if (!text) continue;
+            // ── fenced code blocks: style the block, collapse the fence markers ──
+            const fenceMatch = /^(\s*)(```|~~~)/.exec(text);
+            if (fenceMatch) {
+                if (ln !== active) {
+                    marks.push(cm.markText(
+                        { line: ln, ch: 0 },
+                        { line: ln, ch: text.length },
+                        { className: 'cm-md-fence' },
+                    ));
+                }
+                fence = fence ? null : { indent: fenceMatch[1].length };
+                continue;
+            }
 
+            if (fence) {
+                marks.push(cm.markText(
+                    { line: ln, ch: fence.indent },
+                    { line: ln, ch: text.length },
+                    { className: 'cm-md-code' },
+                ));
+                continue;
+            }
+
+            if (ln === active) continue;   // the caret's line keeps its source
+
+            // ── task list: a real checkbox ──
+            const task = TASK.exec(text);
+            if (task) {
+                const from = task[1].length + 2;   // after "  - "
+                checkbox(ln, from + 1, task[2] !== ' ');   // mark the bracket pair
+            }
+
+            // ── syntax markers ──
             for (const pattern of MARKERS) {
                 pattern.lastIndex = 0;
                 let match;
                 while ((match = pattern.exec(text)) !== null) {
-                    hideRange(ln, match.index, match.index + match[0].length);
                     if (match[0].length === 0) break;
+                    if (task && match.index >= task[0].length - 3 && match.index <= task[0].length - 1) continue;
+                    marks.push(cm.markText(
+                        { line: ln, ch: match.index },
+                        { line: ln, ch: match.index + match[0].length },
+                        { className: 'cm-md-hidden' },
+                    ));
                 }
             }
 
-            // Images: only the ones this application serves (app/Support/Markdown/ImageGuardProcessor).
+            // ── images served by this application ──
             const image = /!\[([^\]]*)\]\(([^)\s]+)\)/.exec(text);
             if (image && /(?:^|\/)uploads\/\d+(?:\/[^/]+)?$/.test(image[2])) {
                 const node = document.createElement('img');
@@ -474,9 +547,11 @@ function wrLivePreview(editor) {
                 node.alt = image[1] || '';
                 node.className = 'cm-md-image';
                 node.loading = 'lazy';
-                const from = { line: ln, ch: image.index };
-                const to = { line: ln, ch: image.index + image[0].length };
-                marks.push(cm.markText(from, to, { replacedWith: node, clearOnEnter: false }));
+                marks.push(cm.markText(
+                    { line: ln, ch: image.index },
+                    { line: ln, ch: image.index + image[0].length },
+                    { replacedWith: node, clearOnEnter: false },
+                ));
             }
         }
     }
@@ -486,10 +561,168 @@ function wrLivePreview(editor) {
         pending = window.requestAnimationFrame(decorate);
     }
 
-    cm.on('cursorActivity', schedule);
+    // ── editing ergonomics ────────────────────────────────────────────────────
+    function lineInfo() {
+        const line = cm.getCursor().line;
+        const text = cm.getLine(line) || '';
+        return {
+            line,
+            text,
+            bullet: /^(\s*)([-*+])\s(\[[ xX]\]\s)?/.exec(text),
+            ordered: /^(\s*)(\d+)([.)])\s/.exec(text),
+            inFence: /^\s*(```|~~~)/.test(text),
+        };
+    }
+
+    function indent(direction) {
+        const { line, text, inFence } = lineInfo();
+        const cursor = cm.getCursor();
+
+        if (inFence) return CodeMirror.Pass;                     // keep literal code literal
+
+        const unit = '  ';
+        if (direction > 0) {
+            cm.replaceRange(unit, { line, ch: 0 });
+            cm.setCursor({ line, ch: cursor.ch + unit.length });
+        } else if (text.startsWith(unit)) {
+            cm.replaceRange('', { line, ch: 0 }, { line, ch: unit.length });
+            cm.setCursor({ line, ch: Math.max(0, cursor.ch - unit.length) });
+        }
+        schedule();
+        return null;   // handled
+    }
+
+    function enter() {
+        const { line, text, bullet, ordered, inFence } = lineInfo();
+        const cursor = cm.getCursor();
+        if (inFence) return CodeMirror.Pass;
+
+        // Only continue a list when the caret is at the end of that item.
+        if (cursor.ch < text.length) return CodeMirror.Pass;
+
+        if (bullet) {
+            const [, ws, mark, task] = bullet;
+            const empty = text.trim() === (mark + (task ? ' [ ]' : ''));
+            if (empty) {                          // Enter on an empty item ends the list
+                cm.replaceRange('', { line, ch: 0 }, { line, ch: text.length });
+                return null;
+            }
+            const next = `\n${ws}${mark} ${task ? '[ ] ' : ''}`;
+            cm.replaceSelection(next);
+            schedule();
+            return null;
+        }
+
+        if (ordered) {
+            const [, ws, number, dot] = ordered;
+            const empty = text.trim() === number + dot;
+            if (empty) {
+                cm.replaceRange('', { line, ch: 0 }, { line, ch: text.length });
+                return null;
+            }
+            cm.replaceSelection(`\n${ws}${Number(number) + 1}${dot} `);
+            schedule();
+            return null;
+        }
+
+        return CodeMirror.Pass;
+    }
+
+    const BOLD = /\*\*|__/g;
+
+    function wrap(marker) {
+        const selection = cm.getSelection();
+        const from = cm.getCursor('from');
+        const to = cm.getCursor('to');
+
+        if (selection === '') {
+            cm.replaceSelection(marker + marker);
+            cm.setCursor({ line: from.line, ch: from.ch + marker.length });
+        } else {
+            cm.replaceRange(marker + selection + marker, from, to);
+        }
+        cm.focus();
+        schedule();
+    }
+
+    cm.addKeyMap({
+        Enter: enter,
+        Tab: () => indent(1),
+        'Shift-Tab': () => indent(-1),
+        'Ctrl-B': () => wrap('**'),
+        'Ctrl-I': () => wrap('_'),
+    });
+
+    // ── @mentions ─────────────────────────────────────────────────────────────
+    const people = Array.isArray(window.WR_MENTIONS) ? window.WR_MENTIONS : [];
+    let popup = null;
+    let popupState = null;
+
+    function closePopup() {
+        if (popup) popup.remove();
+        popup = null;
+        popupState = null;
+    }
+
+    function openPopup(matches, coords) {
+        if (popup) popup.remove();
+        popup = document.createElement('div');
+        popup.className = 'cm-mention-pop';
+        matches.forEach((name, index) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.textContent = name;
+            if (index === 0) item.classList.add('is-active');
+            item.addEventListener('mousedown', (event) => {
+                event.preventDefault();
+                insertMention(name);
+            });
+            popup.appendChild(item);
+        });
+        document.body.appendChild(popup);
+        popup.style.left = `${coords.left}px`;
+        popup.style.top = `${coords.bottom + window.scrollY + 4}px`;
+    }
+
+    function insertMention(name) {
+        if (!popupState) return;
+        const { line, from } = popupState;
+        cm.replaceRange(name, { line, ch: from }, { line, ch: cm.getCursor().ch });
+        closePopup();
+        cm.focus();
+    }
+
+    function suggest() {
+        if (people.length === 0) return;
+        const cursor = cm.getCursor();
+        const before = cm.getLine(cursor.line).slice(0, cursor.ch);
+        const match = /@([\p{L}\p{N}_.-]*)$/u.exec(before);
+
+        if (!match || match[1].includes(' ')) { closePopup(); return; }
+
+        const query = match[1].toLowerCase();
+        const matches = people.filter((name) => name.toLowerCase().includes(query)).slice(0, 6);
+
+        if (matches.length === 0) { closePopup(); return; }
+
+        popupState = { line: cursor.line, from: cursor.ch - match[1].length };
+        openPopup(matches, cm.cursorCoords(cursor, 'window'));
+    }
+
+    cm.on('cursorActivity', () => { suggest(); schedule(); });
     cm.on('change', schedule);
     cm.on('viewportChange', schedule);
+    cm.on('blur', closePopup);
     schedule();
+
+    // Status bar: the person's own words, and whether their text is stored.
+    editor.codemirror.on('change', () => {
+        if (!editor.gui || !editor.gui.statusbar) return;
+        const text = cm.getValue();
+        const words = (text.match(/[\p{L}\p{N}]+/gu) || []).length;
+        const counter = editor.gui.statusbar.querySelector('.wr-words');
+        if (counter) counter.textContent = `${words} 단어 · ${text.length} 자`;
+    });
 }
 
 /*
@@ -533,8 +766,10 @@ window.initMarkdownEditors = function (root) {
             element: el,
             autoDownloadFontAwesome: false,
             spellChecker: false,
-            status: false,
             minHeight: '110px',
+            // The status bar carries the word count and the save state; both are ours.
+            status: ['wr-words'],
+            autofocus: false,
             uploadImage: true,
             imageAccept: 'image/png,image/jpeg,image/webp,image/gif,image/avif',
             imageMaxSize: 12 * 1024 * 1024,
@@ -564,7 +799,7 @@ window.initMarkdownEditors = function (root) {
                     className: 'fa fa-list-check',
                     title: '할 일 목록 (issue 키 또는 "제목 | 우선순위 | 진행률 | 상태")',
                 },
-                '|', 'preview', 'side-by-side', 'guide',
+                '|', 'preview', 'fullscreen', 'guide',
             ],
             previewRender: (plainText) => {
                 // EasyMDE wants a string back synchronously, so the server's answer

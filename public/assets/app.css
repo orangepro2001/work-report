@@ -954,7 +954,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
    side-by-side, which collapsed inside this grid. */
 .doc-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 260px;
+    /* The editor renders as it is written (live preview), so there is no preview
+       column to compare against any more: source-and-result, one surface. */
+    grid-template-columns: minmax(0, 1fr) 260px;
     gap: 16px;
     align-items: start;
 }
@@ -1042,3 +1044,32 @@ button, input, select, textarea { font: inherit; color: inherit; }
     display: inline-block; max-height: 220px; max-width: 100%; vertical-align: bottom;
     border-radius: var(--radius-sm); border: 1px solid var(--hair); margin: 2px 0;
 }
+
+/* ── Markdown editor: the final form ──────────────────────────────────────────
+   Fences read as blocks, task boxes are real checkboxes, and the @ popup is the only
+   floating thing left. */
+.EasyMDEContainer .cm-md-fence { color: var(--faint); font-size: .9em; }
+.EasyMDEContainer .cm-md-code {
+    background: var(--zebra); border-radius: 4px;
+    box-shadow: inset 2px 0 0 var(--hair-strong);
+}
+.EasyMDEContainer .cm-md-task {
+    width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px;
+    accent-color: var(--green); cursor: pointer;
+}
+.EasyMDEContainer .CodeMirror-line:hover { background: color-mix(in srgb, var(--blue-050) 40%, transparent); }
+
+.cm-mention-pop {
+    position: absolute; z-index: 60; min-width: 140px;
+    background: var(--surface); border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-2); padding: 4px;
+    display: flex; flex-direction: column;
+}
+.cm-mention-pop button {
+    text-align: left; border: 0; background: none; color: var(--ink);
+    padding: 5px 8px; border-radius: 4px; font-size: var(--text-sm); cursor: pointer;
+}
+.cm-mention-pop button:hover, .cm-mention-pop button.is-active { background: var(--blue-050); color: var(--blue); }
+
+.EasyMDEContainer .editor-statusbar { padding: 3px 2px; font-size: var(--text-xs); color: var(--faint); }
+.EasyMDEContainer .wr-words::after { content: attr(data-x); }
