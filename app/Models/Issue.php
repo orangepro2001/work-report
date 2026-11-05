@@ -80,6 +80,12 @@ class Issue extends Model
         return $this->belongsToMany(Member::class, 'issue_watchers')->withTimestamps();
     }
 
+    /** The issue's own checklist (app/Models/IssueTodo.php). */
+    public function todos(): HasMany
+    {
+        return $this->hasMany(IssueTodo::class)->orderBy('position')->orderBy('id');
+    }
+
     public function comments(): HasMany
     {
         return $this->hasMany(IssueComment::class)->latest();

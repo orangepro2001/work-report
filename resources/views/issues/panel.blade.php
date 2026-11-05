@@ -115,6 +115,41 @@
     </dl>
 
     <div class="field" style="margin-top:16px">
+        {{-- The checklist: rows in issue_todos, not a fenced block in the description.
+             Ticking one is a single request; the header shows done/total and a meter. --}}
+        <div class="todo" x-data="issueTodos({{ $issue->id }}, {{ \Illuminate\Support\Js::from($todos) }})">
+            <div class="todo__head">
+                <strong>{{ __('ui.issue.todos') }}</strong>
+                <span class="todo__count" x-text="`${done} / ${total}`"></span>
+                <span class="todo__meter" aria-hidden="true"><i :style="`width: ${percent}%`"></i></span>
+                <span class="todo__percent" x-text="`${percent}%`"></span>
+            </div>
+
+            <template x-for="todo in todos" :key="todo.id">
+                <div class="todo__row" :class="{ 'is-done': todo.done }">
+                    <input type="checkbox" class="todo__box" :checked="todo.done"
+                           x-on:change="toggle(todo, $event.target.checked)">
+                    <input class="todo__title" :value="todo.title" maxlength="300"
+                           x-on:change="rename(todo, $event.target.value)"
+                           x-on:keydown.enter.prevent="$event.target.blur()">
+                    <span class="todo__assignee tiny muted" x-text="todo.assignee_name || ''"></span>
+                    <span class="todo__move">
+                        <button type="button" x-on:click="move(todo, 'up')" aria-label="{{ __('ui.issue.todo_up') }}">↑</button>
+                        <button type="button" x-on:click="move(todo, 'down')" aria-label="{{ __('ui.issue.todo_down') }}">↓</button>
+                    </span>
+                    <button type="button" class="todo__delete" x-on:click="remove(todo)"
+                            aria-label="{{ __('ui.common.delete') }}">✕</button>
+                </div>
+            </template>
+
+            <div class="todo__add">
+                <input class="input" type="text" maxlength="300" x-ref="newTodo"
+                       placeholder="{{ __('ui.issue.todo_placeholder') }}"
+                       x-on:keydown.enter.prevent="add()">
+                <button class="btn btn--sm" type="button" x-on:click="add()">+ {{ __('ui.issue.todo_add') }}</button>
+            </div>
+        </div>
+
         <label>{{ __('ui.issue.description') }}</label>
         <textarea class="textarea" rows="4" data-markdown data-field="description"
                   placeholder="{{ __('ui.issue.description_placeholder') }}"

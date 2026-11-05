@@ -417,6 +417,87 @@ window.refreshLiveRegion = async function (changedIssueId) {
 };
 
 /*
+ * The issue checklist (app/Http/Controllers/IssueTodoController).
+ *
+ * Each action answers with the whole list and its progress, so the panel never has to
+ * guess: it replaces its state with the server's. That is also why the Markdown `tasks`
+ * block is not used here — a checklist is data, and data has a shape.
+ */
+function issueTodos(issueId, initial) {
+    return {
+        todos: initial.items || [],
+        total: initial.total || 0,
+        done: initial.done || 0,
+        percent: initial.percent || 0,
+
+        apply(state) {
+            this.todos = state.todos || [];
+            this.total = state.total || 0;
+            this.done = state.done || 0;
+            this.percent = state.percent || 0;
+        },
+
+        async send(url, options = {}) {
+            const res = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                    ...(options.headers || {}),
+                },
+            });
+
+            if (!res.ok) {
+                this.$dispatch('toast', { message: '저장하지 못했습니다' });
+                return;
+            }
+
+            this.apply(await res.json());
+        },
+
+        add() {
+            const field = this.$refs.newTodo;
+            const title = field.value.trim();
+            if (!title) return;
+
+            field.value = '';
+            this.send(`{{ url('issues') }}/${issueId}/todos`, {
+                method: 'POST',
+                body: JSON.stringify({ title }),
+            });
+        },
+
+        toggle(todo, done) {
+            todo.done = done;
+            this.send(`{{ url('todos') }}/${todo.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ done }),
+            });
+        },
+
+        rename(todo, title) {
+            if (title.trim() === '' || title === todo.title) return;
+            this.send(`{{ url('todos') }}/${todo.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ title }),
+            });
+        },
+
+        remove(todo) {
+            this.send(`{{ url('todos') }}/${todo.id}`, { method: 'DELETE' });
+        },
+
+        move(todo, direction) {
+            this.send(`{{ url('todos') }}/${todo.id}/move`, {
+                method: 'POST',
+                body: JSON.stringify({ direction }),
+            });
+        },
+    };
+}
+
+/*
  * Markdown live preview and editing ergonomics — the editor's final form.
  *
  * Everything here is *view-side* work on CodeMirror 5: the document text is never

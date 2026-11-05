@@ -6,6 +6,7 @@ use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\DocumentsController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\IssueController;
+use App\Http\Controllers\IssueTodoController;
 use App\Http\Controllers\MarkdownPreviewController;
 use App\Http\Controllers\SsoAuthController;
 use App\Http\Controllers\UploadController;
@@ -39,6 +40,12 @@ Route::middleware(RequireActor::class)->group(function () {
     // Optimistic board moves: returns the recomputed column payload as JSON.
     Route::post('/issues/{issue}/move', [IssueController::class, 'move'])->name('issues.move');
     Route::post('/issues/{issue}/comments', [IssueController::class, 'comment'])->name('issues.comments');
+
+    // An issue's checklist: rows, not Markdown (app/Models/IssueTodo.php).
+    Route::post('/issues/{issue}/todos', [IssueTodoController::class, 'store'])->name('todos.store');
+    Route::patch('/todos/{todo}', [IssueTodoController::class, 'update'])->name('todos.update');
+    Route::delete('/todos/{todo}', [IssueTodoController::class, 'destroy'])->name('todos.destroy');
+    Route::post('/todos/{todo}/move', [IssueTodoController::class, 'move'])->name('todos.move');
     Route::delete('/comments/{comment}', [IssueController::class, 'destroyComment'])->name('comments.destroy');
 
     // 일보 — the workbook grid.

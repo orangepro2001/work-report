@@ -42,11 +42,21 @@ class IssueController extends Controller
             'coAssignees:id,name,color',
             'comments.author:id,name,color',
             'activities.actor:id,name,color',
+            'todos.assignee:id,name',
             'sprint:id,name,state',
         ]);
 
+        $todos = $issue->todos;
+        $doneTodos = $todos->where('done', true)->count();
+
         $view = view('issues.panel', [
             'issue' => $issue,
+            'todos' => [
+                'items' => $todos->map(fn ($todo) => $todo->payload())->values(),
+                'total' => $todos->count(),
+                'done' => $doneTodos,
+                'percent' => $todos->count() === 0 ? 0 : (int) round($doneTodos / $todos->count() * 100),
+            ],
             'statuses' => config('workreport.statuses'),
             'priorities' => config('workreport.priorities'),
             'members' => Member::active()->internal()->orderBy('position')->get(['id', 'name', 'color']),
