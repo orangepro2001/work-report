@@ -37,13 +37,13 @@ class BoardController extends Controller
         $filters = $this->filters($request);
 
         $projects = Project::visible()->get(['id', 'name', 'abbr', 'color', 'position']);
-        $members = Member::active()->internal()->get(['id', 'name', 'color', 'position']);
+        $members = Member::active()->internal()->get(['id', 'name', 'color', 'picture_url', 'position']);
 
         // Reporter is only rendered in the list lens, so the board and backlog skip
         // that join: one fewer round trip over the tailnet (docs/perf.md).
         $relations = $lens === 'list'
-            ? ['project:id,abbr,name,color', 'assignee:id,name,color', 'coAssignees:id,name,color', 'reporter:id,name']
-            : ['project:id,abbr,name,color', 'assignee:id,name,color', 'coAssignees:id,name,color'];
+            ? ['project:id,abbr,name,color', 'assignee:id,name,color,picture_url', 'coAssignees:id,name,color,picture_url', 'reporter:id,name,color,picture_url']
+            : ['project:id,abbr,name,color', 'assignee:id,name,color,picture_url', 'coAssignees:id,name,color,picture_url'];
 
         $query = Issue::query()
             ->with($relations)

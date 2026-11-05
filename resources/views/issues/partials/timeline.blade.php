@@ -27,8 +27,7 @@
                 }
             @endphp
             <li>
-                <span class="avatar avatar--sm" style="background: {{ $activity->actor?->color ?? '#c9d2de' }}"
-                      title="{{ $activity->actor?->name }}">{{ $activity->actor?->initials() ?? '·' }}</span>
+                <x-avatar :member="$activity->actor" size="sm" />
                 <span>
                     <strong>{{ $activity->actor?->name ?? '—' }}</strong>
                     <span class="muted">{{ __("activity.{$verb}", array_map('strval', $params)) }}</span>

@@ -51,7 +51,7 @@
                         </td>
                         <td>
                             <span style="display:inline-flex;align-items:center;gap:5px">
-                                <span class="avatar avatar--sm" style="background: {{ $document->owner?->color }}">{{ $document->owner?->initials() }}</span>
+                                <x-avatar :member="$document->owner" size="sm" />
                                 {{ $document->owner?->name ?? '—' }}
                             </span>
                         </td>

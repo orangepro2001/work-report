@@ -26,7 +26,10 @@
             'labelSaving' => __('ui.docs.saving'),
             'labelPending' => __('ui.docs.pending'),
             'labelSaved' => __('ui.docs.saved'),
-            'readers' => $readers->map(fn ($m) => ['id' => $m->id, 'name' => $m->name, 'color' => $m->color])->values(),
+            'readers' => $readers->map(fn ($m) => [
+                'id' => $m->id, 'name' => $m->name, 'color' => $m->color,
+                'picture' => $m->picture_url,
+            ])->values(),
         ];
     @endphp
 
@@ -70,7 +73,12 @@
 
             <div style="flex:1"></div>
             <template x-for="reader in readers" :key="reader.id">
-                <span class="avatar avatar--sm" :style="'background: ' + reader.color" :title="reader.name" x-text="reader.name.slice(0, 1)"></span>
+                <span class="avatar avatar--sm" :style="'background: ' + reader.color" :title="reader.name">
+                    <span class="avatar__text" x-text="reader.name.slice(0, 1)"></span>
+                    <template x-if="reader.picture">
+                        <img :src="reader.picture" alt="" loading="lazy">
+                    </template>
+                </span>
             </template>
         </div>
 
@@ -126,7 +134,7 @@
                         <ul style="list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:4px">
                             @forelse ($document->shares as $share)
                                 <li class="tiny" style="display:flex;align-items:center;gap:6px">
-                                    <span class="avatar avatar--sm" style="background: {{ $share->member?->color }}">{{ $share->member?->initials() }}</span>
+                                    <x-avatar :member="$share->member" size="sm" />
                                     {{ $share->member?->name }}
                                     <span class="muted">{{ $share->role }}</span>
                                     <form method="post" action="{{ route('docs.unshare', [$document, $share->member_id]) }}" style="margin-left:auto">

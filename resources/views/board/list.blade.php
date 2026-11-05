@@ -39,7 +39,7 @@
                     <td>
                         <span style="display:inline-flex;align-items:center;gap:5px">
                             @if ($issue->assignee)
-                                <span class="avatar avatar--sm" style="background: {{ $issue->assignee->color }}">{{ $issue->assignee->initials() }}</span>
+                                <x-avatar :member="$issue->assignee" size="sm" />
                             @endif
                             <span class="nowrap">{{ $issue->allAssigneeNames() ?: '—' }}</span>
                         </span>

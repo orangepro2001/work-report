@@ -37,11 +37,11 @@ class IssueController extends Controller
     {
         $issue->load([
             'project:id,name,abbr,color',
-            'assignee:id,name,color',
-            'reporter:id,name,color',
-            'coAssignees:id,name,color',
-            'comments.author:id,name,color',
-            'activities.actor:id,name,color',
+            'assignee:id,name,color,picture_url',
+            'reporter:id,name,color,picture_url',
+            'coAssignees:id,name,color,picture_url',
+            'comments.author:id,name,color,picture_url',
+            'activities.actor:id,name,color,picture_url',
             'todos.assignee:id,name',
             'sprint:id,name,state',
         ]);
@@ -286,7 +286,7 @@ class IssueController extends Controller
 
             $this->log($issue, $actor, 'commented', ['excerpt' => mb_substr($data['body'], 0, 80)]);
 
-            return $comment->load('author:id,name,color');
+            return $comment->load('author:id,name,color,picture_url');
         });
 
         if ($request->expectsJson()) {

@@ -48,8 +48,7 @@
 
                         <div class="card__meta">
                             @if ($issue->assignee)
-                                <span class="avatar avatar--sm" style="background: {{ $issue->assignee->color }}"
-                                      title="{{ $issue->allAssigneeNames() }}">{{ $issue->assignee->initials() }}</span>
+                                <x-avatar :member="$issue->assignee" size="sm" :title="$issue->allAssigneeNames()" />
                             @endif
                             @if ($issue->coAssignees->isNotEmpty())
                                 <span class="tiny muted">+{{ $issue->coAssignees->count() }}</span>

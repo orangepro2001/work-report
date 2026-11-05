@@ -25,11 +25,24 @@ final class OidcActorResolver implements ActorResolver
             return null;
         }
 
-        return Member::query()
+        $member = Member::query()
             ->where('oidc_issuer', $claims['iss'])
             ->where('oidc_subject', $claims['sub'])
-            ->first()
-            ?? $this->enrol($claims);
+            ->first();
+
+        if ($member === null) {
+            return $this->enrol($claims);
+        }
+
+        // The picture lives at the authorization center and can change there; keep the
+        // row in step without a second request.
+        $picture = is_string($claims['picture'] ?? null) ? $claims['picture'] : null;
+
+        if ($picture !== null && $member->picture_url !== $picture) {
+            $member->forceFill(['picture_url' => $picture])->save();
+        }
+
+        return $member;
     }
 
     public function require(): Member
@@ -54,7 +67,11 @@ final class OidcActorResolver implements ActorResolver
         $email = mb_strtolower(trim((string) ($claims['email'] ?? '')));
         $name = trim((string) ($claims['name'] ?? ''));
         $base = Str::slug($username !== '' ? $username : ($email !== '' ? Str::before($email, '@') : (string) $claims['sub']));
-        $link = ['oidc_issuer' => $claims['iss'], 'oidc_subject' => $claims['sub']];
+        $link = [
+            'oidc_issuer' => $claims['iss'],
+            'oidc_subject' => $claims['sub'],
+            'picture_url' => is_string($claims['picture'] ?? null) ? $claims['picture'] : null,
+        ];
 
         // A row that already claims this handle (a seeded member whose e-mail or
         // username was filled in by hand) is adopted instead of duplicated, so the

@@ -5,7 +5,7 @@
 
 <div class="menu" x-data="{ open: false }" x-on:click.outside="open = false">
     <button class="btn btn--ghost" x-on:click="open = !open" title="{{ $actor?->email }}">
-        <span class="avatar" style="background: {{ $actor?->color }}">{{ $actor?->initials() }}</span>
+        <x-avatar :member="$actor" />
         {{ $actor?->name ?? __('ui.identity.label') }}
         <span style="color:var(--faint);font-size:10px">▾</span>
     </button>

@@ -187,6 +187,9 @@ final class SsoAuthController extends Controller
             'sub' => (string) $info['sub'],
             'name' => (string) ($info['name'] ?? ''),
             'username' => (string) ($info['preferred_username'] ?? ''),
+            // Signed URL from the authorization center, or absent when the person
+            // never uploaded a picture (the board falls back to initials).
+            'picture' => is_string($info['picture'] ?? null) ? $info['picture'] : null,
         ];
     }
 

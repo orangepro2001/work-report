@@ -34,7 +34,7 @@ class DocumentsController extends Controller
         $me = $this->actors->require();
 
         $documents = Document::query()
-            ->with(['owner:id,name,color', 'shares.member:id,name'])
+            ->with(['owner:id,name,color,picture_url', 'shares.member:id,name'])
             ->where(fn ($q) => $q->where('visibility', Document::VISIBILITY_TEAM)
                 ->orWhere('owner_id', $me->id)
                 ->orWhereHas('shares', fn ($s) => $s->where('member_id', $me->id)))
@@ -93,7 +93,7 @@ class DocumentsController extends Controller
         $editable = $document->isEditableBy($me);
 
         return view('docs.editor', [
-            'document' => $document->load(['owner:id,name,color', 'shares.member:id,name,color']),
+            'document' => $document->load(['owner:id,name,color,picture_url', 'shares.member:id,name,color,picture_url']),
             'me' => $me,
             // Read mode: what a viewer sees, and what anybody can switch to instead of
             // reading raw Markdown in the editor.

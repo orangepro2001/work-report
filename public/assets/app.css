@@ -1105,3 +1105,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .todo__delete:hover { color: var(--red); background: var(--red-bg); }
 .todo__add { display: flex; gap: 6px; padding: 8px 10px; background: var(--surface); }
 .todo__add .input { height: 28px; font-size: var(--text-sm); }
+
+/* ── Avatars: SSO picture over the initial ────────────────────────────────────
+   <x-avatar> renders both; the image sits on top, so a 404 or an unreachable SSO
+   simply reveals the initial underneath. No JS, no broken-image placeholder. */
+.avatar { position: relative; overflow: hidden; }
+.avatar > .avatar__text { position: relative; z-index: 0; }
+.avatar > img {
+    position: absolute; inset: 0; z-index: 1;
+    width: 100%; height: 100%; object-fit: cover;
+    border-radius: inherit;
+}

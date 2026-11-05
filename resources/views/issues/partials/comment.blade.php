@@ -6,8 +6,7 @@
 @endphp
 
 <article class="comment" data-comment-id="{{ $comment->id }}">
-    <span class="avatar" style="background: {{ $comment->author?->color ?? '#98a2b3' }}"
-          title="{{ $comment->author?->name }}">{{ $comment->author?->initials() ?? '?' }}</span>
+    <x-avatar :member="$comment->author" />
     <div>
         <div class="comment__head">
             <span class="comment__author">{{ $comment->author?->name ?? '—' }}</span>
