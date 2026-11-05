@@ -411,6 +411,22 @@ function documentEditor(id, spec) {
                 return;
             }
 
+            // Never rewrite the editor under the reader. `value()` sends the caret to
+            // the top and the scroll with it, so a poll that lands while somebody is
+            // writing drags them away from where they were — the "it pulls me back up"
+            // report. Taking the revision without the text is enough here: the next
+            // reload, or the conflict bar, is where the newer text gets offered.
+            const editor = this.editor();
+            if (editor && editor.codemirror.hasFocus()) {
+                this.revision = data.revision;
+                return;
+            }
+
+            if ((data.body ?? '') === this.body()) {
+                this.revision = data.revision;
+                return;
+            }
+
             this.setBody(data.body ?? '');
             const title = document.getElementById('doc-title');
             if (title && document.activeElement !== title) title.value = data.title ?? title.value;

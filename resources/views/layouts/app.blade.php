@@ -449,11 +449,15 @@ function wrLivePreview(editor) {
 
     let marks = [];
     let pending = null;
-
-    function clear() {
-        for (const mark of marks) mark.clear();
-        marks = [];
-    }
+    // Image elements are reused per URL. Rebuilding them on every caret move made each
+    // picture load again, the document height changed under the cursor, and CodeMirror
+    // pulled the viewport back to the top — which is exactly what made writing below an
+    // image impossible.
+    const imageCache = new Map();
+    // What the last pass saw: skip the work when neither the text nor the active line
+    // moved, so a plain click inside a paragraph costs nothing.
+    let lastActive = -1;
+    let lastSignature = '';
 
     /** Clickable checkbox: replaces the `[ ]` run on a line that is not being edited. */
     function checkbox(line, from, checked) {
@@ -481,10 +485,19 @@ function wrLivePreview(editor) {
     function decorate() {
         pending = null;
         if (suppress.on) return;
-        clear();
 
         const active = cm.getCursor().line;
         const viewport = cm.getViewport();
+        const signature = `${active}|${cm.getValue().length}|${cm.getViewport().from}`;
+
+        if (signature === lastSignature) return;   // nothing moved: leave the view alone
+        lastSignature = signature;
+
+        // Anything this pass does to the layout is undone afterwards: the reader keeps
+        // the place they were reading.
+        const scrollTop = cm.getScrollInfo().top;
+
+        clear();
 
         let fence = null;   // {line, marker}
 
@@ -542,17 +555,30 @@ function wrLivePreview(editor) {
             // ── images served by this application ──
             const image = /!\[([^\]]*)\]\(([^)\s]+)\)/.exec(text);
             if (image && /(?:^|\/)uploads\/\d+(?:\/[^/]+)?$/.test(image[2])) {
-                const node = document.createElement('img');
-                node.src = image[2];
+                let node = imageCache.get(image[2]);
+                if (!node) {
+                    node = document.createElement('img');
+                    node.src = image[2];
+                    node.className = 'cm-md-image';
+                    node.loading = 'lazy';
+                    // Reserve the space before the bitmap arrives: a late layout shift
+                    // under the caret is the jump this whole cache exists to prevent.
+                    node.style.minHeight = '40px';
+                    imageCache.set(image[2], node);
+                }
                 node.alt = image[1] || '';
-                node.className = 'cm-md-image';
-                node.loading = 'lazy';
                 marks.push(cm.markText(
                     { line: ln, ch: image.index },
                     { line: ln, ch: image.index + image[0].length },
                     { replacedWith: node, clearOnEnter: false },
                 ));
             }
+        }
+
+        lastActive = active;
+
+        if (Math.abs(cm.getScrollInfo().top - scrollTop) > 1) {
+            cm.scrollTo(null, scrollTop);
         }
     }
 
