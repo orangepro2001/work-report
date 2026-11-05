@@ -118,7 +118,17 @@
         <label>{{ __('ui.issue.description') }}</label>
         <textarea class="textarea" rows="4" data-markdown data-field="description"
                   placeholder="{{ __('ui.issue.description_placeholder') }}"
-                  x-on:mde-change.debounce.900ms="save('description', $event.detail.value)">{{ $issue->description }}</textarea>
+                  x-on:mde-change.debounce.900ms="save('description', $event.detail.value); previewDescription($event.detail.value)">{{ $issue->description }}</textarea>
+
+        {{-- The description as readers see it: a `tasks` block, a table or a checklist
+             typed in the editor used to be invisible here, because this panel rendered
+             the textarea and nothing else. Kept in sync by the same debounce as the
+             save (POST /markdown renders it with the application's one renderer). --}}
+        <div id="issue-description-preview-wrap" class="card" style="margin-top:10px;padding:12px 14px"
+             @if (! trim((string) $issue->description)) hidden @endif>
+            <div class="tiny muted" style="margin-bottom:8px">{{ __('ui.issue.description_preview') }}</div>
+            <article id="issue-description-preview" class="markdown">{!! \App\Support\Markdown::toHtml($issue->description) !!}</article>
+        </div>
     </div>
 
     <hr style="border:none;border-top:1px solid var(--hair);margin:18px 0 12px">

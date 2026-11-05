@@ -59,6 +59,7 @@ return [
         'summary' => '要約',
         'summary_placeholder' => 'どんな作業かを一行で',
         'description' => '説明',
+        'description_preview' => 'プレビュー',
         'description_placeholder' => '背景、確認事項、参考リンク。@名前 で同僚を呼べます。',
         'status' => '状態',
         'priority' => '優先度',

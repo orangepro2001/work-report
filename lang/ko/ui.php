@@ -65,6 +65,7 @@ return [
         'summary' => '요약',
         'summary_placeholder' => '무엇을 하는 일인지 한 줄로 적어 주세요',
         'description' => '설명',
+        'description_preview' => '이렇게 보입니다',
         'description_placeholder' => '배경, 확인할 점, 참고 링크를 적어 두세요. @이름 으로 동료를 부를 수 있습니다.',
         'status' => '상태',
         'priority' => '우선순위',

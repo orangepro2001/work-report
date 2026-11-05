@@ -60,6 +60,7 @@ return [
         'summary' => 'Summary',
         'summary_placeholder' => 'One line: what is this work?',
         'description' => 'Description',
+        'description_preview' => 'Preview',
         'description_placeholder' => 'Background, what to check, links. Use @name to call someone in.',
         'status' => 'Status',
         'priority' => 'Priority',

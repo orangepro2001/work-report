@@ -236,6 +236,36 @@ function issuePanel(issueId, initial) {
             return res.redirected || res.status === 419 || res.status === 401 || !type.includes('application/json');
         },
 
+        /** Keeps the rendered description (tasks blocks, tables, mentions) current. */
+        async previewDescription(text) {
+            const pane = document.getElementById('issue-description-preview');
+            const wrap = document.getElementById('issue-description-preview-wrap');
+            if (!pane) return;
+
+            if (!text.trim()) {
+                if (wrap) wrap.hidden = true;
+                return;
+            }
+
+            try {
+                const res = await fetch('{{ route('markdown.preview') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ text }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                pane.innerHTML = data.html || '';
+                if (wrap) wrap.hidden = false;
+            } catch (e) {
+                /* the pane keeps the previous rendering */
+            }
+        },
+
         async save(field, value) {
             const res = await fetch(`{{ url('issues') }}/${issueId}`, {
                 method: 'PATCH',

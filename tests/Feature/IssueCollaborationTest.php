@@ -346,6 +346,24 @@ class IssueCollaborationTest extends TestCase
             ->assertSessionHas('status', __('ui.identity.unreachable'));
     }
 
+    public function test_a_tasks_block_in_the_description_is_rendered_in_the_drawer(): void
+    {
+        $issue = Issue::where('status_key', 'done')->firstOrFail();
+
+        $this->patchJson("/issues/{$issue->id}", [
+            'description' => "**절차**\n\n```tasks\n{$issue->issue_key}\n검토 | high | 40 | in_progress\n```",
+        ])->assertOk();
+
+        $html = (string) $this->get("/issues/{$issue->id}")->assertOk()->getContent();
+
+        // The drawer used to render the textarea and nothing else, so a tasks block
+        // typed there was invisible — the whole point of the block.
+        $this->assertStringContainsString('id="issue-description-preview"', $html);
+        $this->assertStringContainsString('class="tasks"', $html);
+        $this->assertStringContainsString('data-issue-id="'.$issue->id.'"', $html);
+        $this->assertStringContainsString('<strong>절차</strong>', $html);
+    }
+
     public function test_an_outsider_can_be_named_as_the_reporter(): void
     {
         $issue = Issue::firstOrFail();
