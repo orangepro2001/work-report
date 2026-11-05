@@ -84,7 +84,7 @@
     {{-- Issue drawer: filled over the wire, one component for every entry point. --}}
     <div class="drawer__scrim" x-show="drawer.open" x-on:click="closeDrawer()" x-cloak
          x-transition.opacity></div>
-    <aside class="drawer" x-show="drawer.open" x-cloak
+    <aside class="drawer" :class="'drawer--' + drawer.mode" x-show="drawer.open" x-cloak
            x-transition:enter="dr-enter" x-transition:enter-start="dr-enter-start"
            x-transition:enter-end="dr-enter-to" x-transition:leave="dr-leave"
            aria-label="{{ __('ui.issue.open') }}">
@@ -92,6 +92,20 @@
             <span class="key" x-text="drawer.key"></span>
             <span class="muted tiny" x-text="drawer.busy ? '{{ __('ui.common.loading') }}' : ''"></span>
             <div style="flex:1"></div>
+
+            {{-- Three shapes for the same panel: beside the board, centred over it
+                 (the default), or on a page of its own. The choice is remembered. --}}
+            <span class="seg seg--panel" role="group" aria-label="{{ __('ui.issue.mode') }}">
+                <button type="button" title="{{ __('ui.issue.mode_side') }}"
+                        :class="{ 'is-active': drawer.mode === 'side' }"
+                        x-on:click="setPanelMode('side')" aria-label="{{ __('ui.issue.mode_side') }}">◧</button>
+                <button type="button" title="{{ __('ui.issue.mode_modal') }}"
+                        :class="{ 'is-active': drawer.mode === 'modal' }"
+                        x-on:click="setPanelMode('modal')" aria-label="{{ __('ui.issue.mode_modal') }}">▣</button>
+                <button type="button" title="{{ __('ui.issue.mode_page') }}"
+                        x-on:click="panelPage()" aria-label="{{ __('ui.issue.mode_page') }}">⤢</button>
+            </span>
+
             <button class="btn btn--ghost btn--icon" x-on:click="closeDrawer()" aria-label="{{ __('ui.common.close') }}">✕</button>
         </div>
         <div class="drawer__body" x-html="drawer.html"></div>
@@ -120,7 +134,7 @@
 <script>
 function app() {
     return {
-        drawer: { open: false, html: '', key: '', busy: false },
+        drawer: { open: false, html: '', key: '', busy: false, url: '', mode: 'modal' },
         create: { open: false },
         toastTimer: null,
 
@@ -131,6 +145,12 @@ function app() {
             // Textareas served with the page (the document editor) are adopted here.
             // The drawer and the composer are fetched later and call this themselves.
             this.$nextTick(() => window.initMarkdownEditors(this.$el));
+
+            // Panel shape: side / modal (default) / page. Remembered per browser.
+            try {
+                const stored = localStorage.getItem('wr-panel');
+                if (stored === 'side' || stored === 'modal') this.drawer.mode = stored;
+            } catch (e) {}
 
             // Follow the browser history so the back button closes the drawer.
             window.addEventListener('popstate', () => this.closeDrawer(true));
@@ -151,6 +171,21 @@ function app() {
                     this.pending = false;
                 }
             });
+        },
+
+        setPanelMode(mode) {
+            this.drawer.mode = mode;
+            try { localStorage.setItem('wr-panel', mode); } catch (e) {}
+        },
+
+        /** Full screen means a page of its own — a real URL, not a bigger box. */
+        panelPage() {
+            if (this.drawer.url) {
+                window.location = this.drawer.url;
+            } else if (this.drawer.open) {
+                // The key is only known from the fragment; fall back to the board.
+                window.location.reload();
+            }
         },
 
         isTyping(e) {

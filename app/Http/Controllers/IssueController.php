@@ -26,7 +26,14 @@ class IssueController extends Controller
         private readonly IssueKeyGenerator $keys,
     ) {}
 
-    public function show(Issue $issue)
+    /**
+     * The panel, in whichever shape the caller asked for.
+     *
+     * The board fetches it as a fragment for the drawer/modal; opening the same URL
+     * directly (a bookmark, a new tab, "전체 화면") renders it inside the layout, so
+     * there is one panel markup and three ways to look at it.
+     */
+    public function show(Request $request, Issue $issue)
     {
         $issue->load([
             'project:id,name,abbr,color',
@@ -38,7 +45,7 @@ class IssueController extends Controller
             'sprint:id,name,state',
         ]);
 
-        return view('issues.panel', [
+        $view = view('issues.panel', [
             'issue' => $issue,
             'statuses' => config('workreport.statuses'),
             'priorities' => config('workreport.priorities'),
@@ -48,6 +55,10 @@ class IssueController extends Controller
             'reporters' => Member::active()->orderBy('name')->get(['id', 'name', 'is_external']),
             'notes' => config('workreport.note_presets'),
         ]);
+
+        return $request->ajax()
+            ? $view
+            : view('issues.page', ['issue' => $issue, 'panel' => $view->render()]);
     }
 
     public function store(Request $request)

@@ -346,6 +346,23 @@ class IssueCollaborationTest extends TestCase
             ->assertSessionHas('status', __('ui.identity.unreachable'));
     }
 
+    public function test_the_panel_serves_a_fragment_or_a_page(): void
+    {
+        $issue = Issue::firstOrFail();
+
+        // The board asks for the fragment…
+        $fragment = (string) $this->get("/issues/{$issue->id}", ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->getContent();
+        $this->assertStringNotContainsString('<html', $fragment);
+        $this->assertStringContainsString('id="issue-description-preview"', $fragment);
+
+        // …and opening the same URL directly is a page of its own (full screen mode).
+        $page = (string) $this->get("/issues/{$issue->id}")->assertOk()->getContent();
+        $this->assertStringContainsString('<html', $page);
+        $this->assertStringContainsString('panel-page', $page);
+        $this->assertStringContainsString('id="issue-description-preview"', $page);
+    }
+
     public function test_a_tasks_block_in_the_description_is_rendered_in_the_drawer(): void
     {
         $issue = Issue::where('status_key', 'done')->firstOrFail();
@@ -393,7 +410,9 @@ class IssueCollaborationTest extends TestCase
         $issue = Issue::firstOrFail();
         $this->patchJson("/issues/{$issue->id}", ['reporter_name' => '김철수 과장'])->assertOk();
 
-        $html = (string) $this->get("/issues/{$issue->id}")->assertOk()->getContent();
+        // The fragment, the way the board fetches it for the drawer/modal.
+        $html = (string) $this->get("/issues/{$issue->id}", ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->getContent();
 
         // The reporter field carries the typed name…
         $this->assertStringContainsString('value="김철수 과장"', $html);

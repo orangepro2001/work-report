@@ -981,3 +981,34 @@ button, input, select, textarea { font: inherit; color: inherit; }
     color: var(--ink-2);
 }
 .theme-toggle:hover { color: var(--ink); }
+
+/* ── Issue panel: three shapes, one markup ────────────────────────────────────
+   side   — beside the board (the original drawer)
+   modal  — centred over it (the default): narrower, rounded, its own scroll
+   page   — a real URL (/issues/{id}) inside the layout, for reading or editing
+            with the whole window and for sharing a link. */
+.drawer--modal {
+    inset: 6vh auto auto 50%;
+    transform: translateX(-50%);
+    width: min(760px, 92vw);
+    height: auto;
+    max-height: 86vh;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-3);
+    border: 1px solid var(--hair);
+    overflow: hidden;
+}
+.drawer--modal .drawer__body { max-height: calc(86vh - 44px); overflow: auto; }
+.drawer--side { inset: 0 0 0 auto; width: min(560px, 100vw); height: 100%; border-radius: 0; }
+
+.seg--panel { display: inline-flex; border: 1px solid var(--hair); border-radius: var(--radius-sm); overflow: hidden; }
+.seg--panel button {
+    border: 0; background: var(--surface); color: var(--ink-2); padding: 4px 9px; cursor: pointer;
+    font-size: 12px; line-height: 1.2;
+}
+.seg--panel button + button { border-left: 1px solid var(--hair); }
+.seg--panel button.is-active { background: var(--blue-050); color: var(--blue); font-weight: 700; }
+.seg--panel button:hover { background: var(--slate-bg); }
+
+.panel-page { max-width: 900px; margin: 0 auto; }
+.panel-page .card { box-shadow: var(--shadow-1); }
