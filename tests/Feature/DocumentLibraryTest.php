@@ -152,6 +152,21 @@ class DocumentLibraryTest extends TestCase
         $this->assertTrue($json['readers'][0]['me']);
     }
 
+    public function test_the_editor_page_wires_the_page_load_markdown_editor(): void
+    {
+        $document = $this->document();
+
+        $html = (string) $this->get('/docs/'.$document->slug)->assertOk()->getContent();
+
+        // Without data-markdown the textarea would stay a plain textarea, and without
+        // data-markdown-split the live preview would not open beside it.
+        $this->assertStringContainsString('data-markdown', $html);
+        $this->assertStringContainsString('data-markdown-split', $html);
+        $this->assertStringContainsString('easymde.min.js', $html);
+        // The editor is built on page load, not only when the drawer opens.
+        $this->assertStringContainsString('initMarkdownEditors(this.$el)', $html);
+    }
+
     public function test_markdown_body_is_rendered_through_the_shared_renderer(): void
     {
         $document = $this->document([

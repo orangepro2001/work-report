@@ -111,6 +111,10 @@ function app() {
             const base = this.$el.dataset.base || '';
             this.base = base;
 
+            // Textareas served with the page (the document editor) are adopted here.
+            // The drawer and the composer are fetched later and call this themselves.
+            this.$nextTick(() => window.initMarkdownEditors(this.$el));
+
             // Follow the browser history so the back button closes the drawer.
             window.addEventListener('popstate', () => this.closeDrawer(true));
 
@@ -402,27 +406,47 @@ window.initMarkdownEditors = function (root) {
                 '|', 'preview', 'side-by-side', 'guide',
             ],
             previewRender: (plainText) => {
-                // EasyMDE wants a string; the server's answer replaces the pane once
-                // it arrives, so the preview never renders anything unsanitised.
-                fetch('{{ route('markdown.preview') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ text: plainText }),
-                })
-                    .then((res) => (res.ok ? res.json() : { html: '' }))
-                    .then((data) => {
-                        const pane = el.closest('.EasyMDEContainer')?.querySelector('.editor-preview');
-                        if (pane) pane.innerHTML = data.html || '';
-                    })
-                    .catch(() => {});
+                // EasyMDE wants a string back synchronously, so the server's answer
+                // replaces the pane once it lands. The debounce keeps side-by-side
+                // mode from firing a request per keystroke; the preview is still the
+                // saved output's renderer, never a second client-side parser.
+                const pane = () => el.closest('.EasyMDEContainer')?.querySelector('.editor-preview-side, .editor-preview');
+                const seed = pane()?.innerHTML || '<p class="muted">{{ __('ui.common.loading') }}</p>';
 
-                return '<p class="muted">{{ __('ui.common.loading') }}</p>';
+                clearTimeout(el._previewTimer);
+                el._previewTimer = setTimeout(() => {
+                    fetch('{{ route('markdown.preview') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ text: plainText }),
+                    })
+                        .then((res) => (res.ok ? res.json() : { html: '' }))
+                        .then((data) => {
+                            const target = pane();
+                            if (target) {
+                                // The markdown classes are what give the preview the same
+                                // typography as the saved document.
+                                target.classList.add('markdown');
+                                target.innerHTML = data.html || '';
+                            }
+                        })
+                        .catch(() => {});
+                }, 250);
+
+                return seed;
             },
         });
+
+        // A document is written to be read: side-by-side puts the rendered result
+        // next to the source and keeps it there while typing.
+        if (el.dataset.markdownSplit !== undefined) {
+            editor.toggleSideBySide();
+            editor.codemirror.getWrapperElement()?.classList.add('wr-split');
+        }
 
         // The textarea is hidden by EasyMDE; the field name lives on it, so the
         // panel keeps its own saving logic and Alpine's debounce does the throttling.

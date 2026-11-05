@@ -68,7 +68,7 @@
                            x-on:blur="save(true)">
                     <a class="btn btn--ghost btn--sm" style="float:right;margin-top:-38px"
                        href="{{ route('docs.show', $document) }}?read=1">{{ __('ui.docs.view') }}</a>
-                    <textarea class="textarea" id="doc-body" rows="24" data-markdown data-field="body"
+                    <textarea class="textarea" id="doc-body" rows="24" data-markdown data-markdown-split data-field="body"
                               data-document-id="{{ $document->id }}"
                               placeholder="{{ __('ui.docs.body_placeholder') }}">{{ $document->body }}</textarea>
                     <div class="tiny muted" style="margin-top:8px">{{ __('ui.docs.editor_hint') }}</div>
