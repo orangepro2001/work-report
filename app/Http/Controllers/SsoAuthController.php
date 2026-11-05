@@ -131,7 +131,13 @@ final class SsoAuthController extends Controller
         $request->session()->forget(OidcActorResolver::SESSION_KEY);
         $request->session()->regenerate();
 
-        return redirect()->away((string) config('workreport.sso.issuer'));
+        // The SSO keeps its own session (its logout is POST-only), so signing out here
+        // hands the browser to the sign-in page *with this board as the destination*:
+        // signing in there comes straight back instead of stranding the person on the
+        // issuer's home page.
+        $next = url('/');
+
+        return redirect()->away(config('workreport.sso.issuer').'/login?next='.urlencode($next));
     }
 
     private function authorizeUrl(string $state): string

@@ -326,7 +326,7 @@ class IssueCollaborationTest extends TestCase
         config(['workreport.sso.issuer' => 'https://sso.test/sso']);
 
         $this->post('/auth/logout')
-            ->assertRedirect('https://sso.test/sso');
+            ->assertRedirect('https://sso.test/sso/login?next='.urlencode(url('/')));
 
         $this->assertNull(session('oidc.claims'));
     }

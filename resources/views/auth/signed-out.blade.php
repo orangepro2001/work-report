@@ -15,7 +15,7 @@
     <p class="muted">{{ __('ui.identity.signed_out_body') }}</p>
     <p>
         <a class="btn" href="{{ config('workreport.sso.issuer') }}">{{ __('ui.identity.open_sso') }}</a>
-        <a class="btn btn--ghost" href="{{ route('board') }}">{{ __('ui.identity.sign_in_again') }}</a>
+        <a class="btn btn--ghost" href="{{ config('workreport.sso.issuer') }}/login?next={{ urlencode(url('/')) }}">{{ __('ui.identity.sign_in_again') }}</a>
     </p>
 </main>
 </body>
