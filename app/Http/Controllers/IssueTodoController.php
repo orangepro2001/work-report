@@ -22,6 +22,7 @@ class IssueTodoController extends Controller
     public function store(Request $request, Issue $issue): JsonResponse
     {
         $me = $this->actors->require();
+        abort_unless($issue->isOwnedBy($me), 403, __('ui.issue.not_yours'));
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:300'],
@@ -42,7 +43,7 @@ class IssueTodoController extends Controller
 
     public function update(Request $request, IssueTodo $todo): JsonResponse
     {
-        $this->actors->require();
+        abort_unless($todo->issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:300'],
@@ -63,7 +64,7 @@ class IssueTodoController extends Controller
 
     public function destroy(IssueTodo $todo): JsonResponse
     {
-        $this->actors->require();
+        abort_unless($todo->issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
 
         $issue = $todo->issue;
         $todo->delete();
@@ -74,7 +75,7 @@ class IssueTodoController extends Controller
     /** One row up or down; the list is small, so positions are renumbered in full. */
     public function move(Request $request, IssueTodo $todo): JsonResponse
     {
-        $this->actors->require();
+        abort_unless($todo->issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
 
         $direction = $request->string('direction')->toString() === 'up' ? -1 : 1;
         $issue = $todo->issue;

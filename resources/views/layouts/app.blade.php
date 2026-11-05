@@ -452,8 +452,9 @@ window.refreshLiveRegion = async function (changedIssueId) {
  * guess: it replaces its state with the server's. That is also why the Markdown `tasks`
  * block is not used here — a checklist is data, and data has a shape.
  */
-function issueTodos(issueId, initial) {
+function issueTodos(issueId, initial, owned = true) {
     return {
+        owned,
         todos: initial.items || [],
         total: initial.total || 0,
         done: initial.done || 0,

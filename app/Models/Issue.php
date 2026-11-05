@@ -80,6 +80,22 @@ class Issue extends Model
         return $this->belongsToMany(Member::class, 'issue_watchers')->withTimestamps();
     }
 
+    /**
+     * Does this issue belong to this person?
+     *
+     * Ownership is narrow on purpose: the assignee or the reporter. Everyone else can
+     * read it, comment on it, and nothing more — the board is a shared view of work that
+     * individual people are responsible for, not a wiki where anyone edits anything.
+     */
+    public function isOwnedBy(?Member $member): bool
+    {
+        if ($member === null) {
+            return false;
+        }
+
+        return $this->assignee_id === $member->id || $this->reporter_id === $member->id;
+    }
+
     /** The issue's own checklist (app/Models/IssueTodo.php). */
     public function todos(): HasMany
     {

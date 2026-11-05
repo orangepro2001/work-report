@@ -141,6 +141,9 @@ class IssueController extends Controller
 
     public function update(Request $request, Issue $issue)
     {
+        // Strict isolation: only the person responsible for this issue may change it.
+        abort_unless($issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
+
         $data = $request->validate([
             'summary' => ['sometimes', 'string', 'max:300'],
             'description' => ['sometimes', 'nullable', 'string', 'max:20000'],
@@ -218,6 +221,8 @@ class IssueController extends Controller
      */
     public function move(Request $request, Issue $issue)
     {
+        abort_unless($issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
+
         $data = $request->validate([
             'status_key' => ['required', Rule::in(array_column(config('workreport.statuses'), 'key'))],
             'before_id' => ['nullable', 'integer'],
@@ -263,6 +268,8 @@ class IssueController extends Controller
 
     public function destroy(Issue $issue)
     {
+        abort_unless($issue->isOwnedBy($this->actors->current()), 403, __('ui.issue.not_yours'));
+
         $key = $issue->issue_key;
         $issue->delete(); // soft delete: the key is never reused
 
@@ -309,6 +316,9 @@ class IssueController extends Controller
 
     public function destroyComment(IssueComment $comment)
     {
+        // A comment belongs to whoever wrote it; the issue's owner is not its editor.
+        abort_unless($comment->author_id === $this->actors->current()?->id, 403, __('ui.issue.not_yours'));
+
         $comment->delete();
 
         return response()->json(['ok' => true]);

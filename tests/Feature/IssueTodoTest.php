@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\ActorResolver;
 use App\Models\Issue;
 use App\Models\IssueTodo;
+use App\Models\Member;
 use Database\Seeders\IssueSeeder;
 use Database\Seeders\MemberSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,12 +25,22 @@ class IssueTodoTest extends TestCase
     {
         parent::setUp();
         $this->seed([MemberSeeder::class, IssueSeeder::class]);
-        $this->signInAs();
+        // Whichever seeded member actually owns cards: strict isolation means the
+        // checklist of somebody else's issue is not writable.
+        $this->signInAs(Member::withCount('assignedIssues')->orderByDesc('assigned_issues_count')->firstOrFail());
+    }
+
+    /** Strict isolation: an issue's checklist belongs to whoever owns the issue. */
+    private function ownIssue(): Issue
+    {
+        $me = app(ActorResolver::class)->current();
+
+        return Issue::where('assignee_id', $me->id)->firstOrFail();
     }
 
     public function test_items_can_be_added_and_progress_follows(): void
     {
-        $issue = Issue::firstOrFail();
+        $issue = $this->ownIssue();
 
         $json = $this->postJson("/issues/{$issue->id}/todos", ['title' => '도면 확인'])->assertOk()->json();
 
@@ -47,7 +59,7 @@ class IssueTodoTest extends TestCase
 
     public function test_items_can_be_renamed_reordered_and_removed(): void
     {
-        $issue = Issue::firstOrFail();
+        $issue = $this->ownIssue();
 
         foreach (['하나', '둘'] as $title) {
             $this->postJson("/issues/{$issue->id}/todos", ['title' => $title])->assertOk();
@@ -69,7 +81,7 @@ class IssueTodoTest extends TestCase
 
     public function test_the_panel_renders_the_checklist_with_its_progress(): void
     {
-        $issue = Issue::firstOrFail();
+        $issue = $this->ownIssue();
 
         $this->postJson("/issues/{$issue->id}/todos", ['title' => '장비 점검'])->assertOk();
         $this->postJson("/issues/{$issue->id}/todos", ['title' => '결과 정리'])->assertOk();
@@ -87,7 +99,7 @@ class IssueTodoTest extends TestCase
 
     public function test_a_hard_deleted_issue_takes_its_checklist_with_it(): void
     {
-        $issue = Issue::firstOrFail();
+        $issue = $this->ownIssue();
         $this->postJson("/issues/{$issue->id}/todos", ['title' => '정리'])->assertOk();
 
         $this->assertSame(1, IssueTodo::count());

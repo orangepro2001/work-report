@@ -67,6 +67,8 @@ return [
         'delete_confirm' => 'この課題を保管庫へ移しますか？番号は再利用されません。',
         'delete_failed' => '削除できませんでした',
         'deleted' => '課題を保管庫へ移しました',
+        'not_yours' => '担当者または報告者のみ変更できます',
+        'read_only' => '閲覧のみ',
         'todos' => 'やること',
         'todo_add' => '追加',
         'todo_placeholder' => 'やることを入力して Enter',

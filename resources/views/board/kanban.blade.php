@@ -30,7 +30,7 @@
                        data-issue-id="{{ $issue->id }}"
                        data-issue-key="{{ $issue->issue_key }}"
                        data-status="{{ $issue->status_key }}"
-                       draggable="true"
+                       draggable="{{ $cardIsMine ? 'true' : 'false' }}"
                        x-on:dragstart="dragStart($event, $el)"
                        x-on:dragend="dragEnd($event, $el)"
                        x-on:click.prevent="$dispatch('open-issue', { url: $el.href })">

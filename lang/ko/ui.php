@@ -73,6 +73,8 @@ return [
         'delete_confirm' => '이슈를 보관함으로 옮길까요? 번호는 다시 쓰이지 않습니다.',
         'delete_failed' => '삭제하지 못했습니다',
         'deleted' => '이슈를 보관함으로 옮겼습니다',
+        'not_yours' => '담당자 또는 보고자만 수정할 수 있습니다',
+        'read_only' => '읽기 전용',
         'todos' => '할 일',
         'todo_add' => '추가',
         'todo_placeholder' => '할 일을 적고 Enter',

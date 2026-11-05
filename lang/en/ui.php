@@ -68,6 +68,8 @@ return [
         'delete_confirm' => 'Move this issue to the archive? Its key is never reused.',
         'delete_failed' => 'Could not delete',
         'deleted' => 'moved to the archive',
+        'not_yours' => 'Only the assignee or the reporter can change this',
+        'read_only' => 'read only',
         'todos' => 'Checklist',
         'todo_add' => 'Add',
         'todo_placeholder' => 'Add a task and press Enter',
