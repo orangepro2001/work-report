@@ -266,6 +266,10 @@ class IssueController extends Controller
         $key = $issue->issue_key;
         $issue->delete(); // soft delete: the key is never reused
 
+        if (request()->expectsJson()) {
+            return response()->json(['ok' => true, 'id' => $issue->id, 'key' => $key]);
+        }
+
         return redirect()->route('board.index')->with('status', "{$key} 이슈를 보관함으로 옮겼습니다.");
     }
 

@@ -176,6 +176,35 @@ function app() {
             });
         },
 
+        /**
+         * Delete one issue from its card. Soft delete on the server (the key is never
+         * reused), then the live region is re-rendered so the card and the counters
+         * agree with the database in the same beat.
+         */
+        async removeIssue(id, key) {
+            if (!window.confirm(`${key} ${{{ __('ui.issue.delete_confirm') }}}`)) return;
+
+            const res = await fetch(`{{ url('issues') }}/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!res.ok) {
+                this.$dispatch('toast', { message: '{{ __('ui.issue.delete_failed') }}' });
+                return;
+            }
+
+            if (this.drawer.open && this.drawer.url && this.drawer.url.includes(`/issues/${id}`)) {
+                this.closeDrawer();
+            }
+
+            window.refreshLiveRegion(id);
+            this.$dispatch('toast', { message: `${key} {{ __('ui.issue.deleted') }}` });
+        },
+
         setPanelMode(mode) {
             this.drawer.mode = mode;
             try { localStorage.setItem('wr-panel', mode); } catch (e) {}

@@ -1,6 +1,11 @@
 @php
     $date = $date ?? null;
     $isLate = fn ($issue) => $issue->isLateOn(now());
+    $actor = app(\App\Contracts\ActorResolver::class)->current();
+    // Your card: you own the work or you reported it. That is who gets the delete
+    // button; anyone else can still archive from the panel.
+    $mine = fn ($issue) => $actor !== null
+        && ($issue->assignee_id === $actor->id || $issue->reporter_id === $actor->id);
 @endphp
 
 <div class="board" x-data="board()" x-cloak>
@@ -19,6 +24,7 @@
                  x-on:drop="drop($event, $el)">
 
                 @foreach ($column['issues'] as $issue)
+                    @php($cardIsMine = $mine($issue))
                     <a class="card {{ $issue->status_key === 'done' ? 'card--done' : '' }} {{ $isLate($issue) ? 'card--late' : '' }}"
                        href="{{ route('issues.show', $issue) }}"
                        data-issue-id="{{ $issue->id }}"
@@ -33,6 +39,16 @@
                             <span class="key">{{ $issue->issue_key }}</span>
                             <span class="dot" style="width:6px;height:6px;border-radius:50%;background:{{ $issue->project?->color }}"
                                   title="{{ $issue->project?->name }}"></span>
+                            @if ($cardIsMine)
+                                {{-- Only on your own cards, and on hover: deleting is not a
+                                     thing to do by accident while dragging. Soft delete —
+                                     the issue key is never reused. --}}
+                                <button class="card__delete" type="button"
+                                        title="{{ __('ui.issue.delete') }}"
+                                        aria-label="{{ __('ui.issue.delete') }} {{ $issue->issue_key }}"
+                                        x-on:click.stop.prevent="removeIssue({{ $issue->id }}, '{{ $issue->issue_key }}')">✕</button>
+                            @endif
+
                             @if ($issue->priority_key === 'high')
                                 <span class="chip chip--red" style="margin-left:auto">High</span>
                             @elseif ($issue->priority_key === 'medium')
