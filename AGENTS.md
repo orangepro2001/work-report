@@ -68,6 +68,12 @@ to the `AI` host every night (`deploy/scripts/backup-offsite.sh`, timer
 
 ## Gotchas that cost time already
 
+- **Logical replication carries no DDL.** A migration that touches a published table
+  leaves the subscriber behind until `deploy/scripts/replication.sh resync` rebuilds it
+  from a dump (no restart, docs/replication.md). Failed table-sync workers also leave
+  `pg_*_sync_*` slots behind: once `max_replication_slots` is full the initial copy
+  stalls silently, so `resync` cleans them first.
+
 - **The offsite mirror replaces, it does not accumulate.** `work-report.sql.gz` on
   the AI host is overwritten daily; if you need a point two weeks back, that lives
   in `~/backups/work-report/` here via `backup.sh`. The mirror refuses to overwrite

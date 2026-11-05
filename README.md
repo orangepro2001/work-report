@@ -155,6 +155,7 @@ service is its own container (`work-report-collab`, loopback only, proxied at
 - [docs/excel-schema.md](docs/excel-schema.md) — the workbook, extracted and specified
 - [docs/architecture.md](docs/architecture.md) — how the pieces fit
 - [docs/deploy.md](docs/deploy.md) — Podman, Quadlet, `/report` reverse proxy
+- [docs/replication.md](docs/replication.md) — standby copy on the AI host, and the no-restart fallbacks
 - [docs/auth-seam.md](docs/auth-seam.md) — the OIDC integration point
 - [docs/ui.md](docs/ui.md) — interaction model and design tokens
 

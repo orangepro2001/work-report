@@ -21,7 +21,12 @@ ContainerName=work-report-db
 # max_slot_wal_keep_size caps the WAL an unreachable subscriber may pin at 1GB —
 # past that the slot is invalidated (the mirror then needs a resync) instead of the
 # publisher's disk filling up.
-Exec=postgres -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10 -c max_slot_wal_keep_size=1GB
+#
+# Each table-sync worker also takes a slot of its own while the initial copy runs, so
+# the slot budget has to cover the subscription *plus* room for them; a failed worker
+# leaves its slot behind, and a full budget makes the failure permanent
+# (docs/replication.md, deploy/scripts/replication.sh clean_stale_slots).
+Exec=postgres -c wal_level=logical -c max_replication_slots=20 -c max_wal_senders=20 -c max_slot_wal_keep_size=1GB
 
 # Loopback for the app container (host networking) plus the tailnet address: the AI
 # host's subscription connects from there. Nothing is published on the LAN or public
