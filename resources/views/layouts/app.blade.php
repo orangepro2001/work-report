@@ -681,11 +681,16 @@ function wrLivePreview(editor) {
         };
     }
 
+    // The CodeMirror constructor is not a global in EasyMDE's bundle, so referencing
+    // its `Pass` sentinel directly throws a ReferenceError the moment a key falls
+    // through. Take it from the instance; if it is missing, skip the keymap.
+    const PASS = (cm.constructor && cm.constructor.Pass) || null;
+
     function indent(direction) {
         const { line, text, inFence } = lineInfo();
         const cursor = cm.getCursor();
 
-        if (inFence) return CodeMirror.Pass;                     // keep literal code literal
+        if (inFence) return PASS;                                // keep literal code literal
 
         const unit = '  ';
         if (direction > 0) {
@@ -702,10 +707,10 @@ function wrLivePreview(editor) {
     function enter() {
         const { line, text, bullet, ordered, inFence } = lineInfo();
         const cursor = cm.getCursor();
-        if (inFence) return CodeMirror.Pass;
+        if (inFence) return PASS;
 
         // Only continue a list when the caret is at the end of that item.
-        if (cursor.ch < text.length) return CodeMirror.Pass;
+        if (cursor.ch < text.length) return PASS;
 
         if (bullet) {
             const [, ws, mark, task] = bullet;
@@ -732,7 +737,7 @@ function wrLivePreview(editor) {
             return null;
         }
 
-        return CodeMirror.Pass;
+        return PASS;
     }
 
     const BOLD = /\*\*|__/g;
@@ -752,13 +757,15 @@ function wrLivePreview(editor) {
         schedule();
     }
 
-    cm.addKeyMap({
-        Enter: enter,
-        Tab: () => indent(1),
-        'Shift-Tab': () => indent(-1),
-        'Ctrl-B': () => wrap('**'),
-        'Ctrl-I': () => wrap('_'),
-    });
+    if (PASS) {
+        cm.addKeyMap({
+            Enter: enter,
+            Tab: () => indent(1),
+            'Shift-Tab': () => indent(-1),
+            'Ctrl-B': () => wrap('**'),
+            'Ctrl-I': () => wrap('_'),
+        });
+    }
 
     // ── @mentions ─────────────────────────────────────────────────────────────
     const people = Array.isArray(window.WR_MENTIONS) ? window.WR_MENTIONS : [];
@@ -822,14 +829,21 @@ function wrLivePreview(editor) {
     cm.on('blur', closePopup);
     schedule();
 
-    // Status bar: the person's own words, and whether their text is stored.
-    editor.codemirror.on('change', () => {
-        if (!editor.gui || !editor.gui.statusbar) return;
+    // Word count, in an element of our own under the editor: EasyMDE's status bar is
+    // optional machinery we do not need.
+    const counter = document.createElement('div');
+    counter.className = 'md-count tiny muted';
+    (editor.codemirror.getWrapperElement().parentNode || editor.codemirror.getWrapperElement())
+        .appendChild(counter);
+
+    function count() {
         const text = cm.getValue();
         const words = (text.match(/[\p{L}\p{N}]+/gu) || []).length;
-        const counter = editor.gui.statusbar.querySelector('.wr-words');
-        if (counter) counter.textContent = `${words} 단어 · ${text.length} 자`;
-    });
+        counter.textContent = `${words} 단어 · ${text.length} 자`;
+    }
+
+    cm.on('change', count);
+    count();
 }
 
 /*
@@ -846,6 +860,25 @@ window.initMarkdownEditors = function (root) {
     root.querySelectorAll('textarea[data-markdown]').forEach((el) => {
         if (el.dataset.mdeReady === '1') return;
         el.dataset.mdeReady = '1';
+
+        // A textarea inside a drawer that is still animating in has no measurable size,
+        // and CodeMirror built at that moment renders empty (or half-built: a toolbar
+        // with the original textarea still visible). Wait for a layout box.
+        if (el.offsetParent === null || el.getBoundingClientRect().width === 0) {
+            let tries = 0;
+            const waitForLayout = () => {
+                if (el.offsetParent !== null && el.getBoundingClientRect().width > 0) {
+                    el.dataset.mdeReady = '0';
+                    window.initMarkdownEditors(el.parentNode || document);
+
+                    return;
+                }
+                if (tries++ < 30) requestAnimationFrame(waitForLayout);
+            };
+            requestAnimationFrame(waitForLayout);
+
+            return;
+        }
 
         // Images never leave this host: EasyMDE hands the file to our own endpoint,
         // which answers with the URL of a file served through /uploads/{id}. The
@@ -869,80 +902,92 @@ window.initMarkdownEditors = function (root) {
                 .catch(() => onError('이미지를 올리지 못했습니다'));
         };
 
-        const editor = new window.EasyMDE({
-            element: el,
-            autoDownloadFontAwesome: false,
-            spellChecker: false,
-            minHeight: '110px',
-            // The status bar carries the word count and the save state; both are ours.
-            status: ['wr-words'],
-            autofocus: false,
-            uploadImage: true,
-            imageAccept: 'image/png,image/jpeg,image/webp,image/gif,image/avif',
-            imageMaxSize: 12 * 1024 * 1024,
-            imageUploadFunction: uploadImage,
-            imageTexts: {
-                sbInit: '이미지를 끌어다 놓거나 붙여넣으세요 (이 서버에 저장됩니다)',
-                sbOnDragEnter: '놓으면 업로드합니다',
-                sbOnDrop: '업로드 중…',
-                sbProgress: '업로드 중… (#file_progress#)',
-                sbOnUploaded: '업로드 완료',
-                sizeUnits: ' KB, MB',
-            },
-            placeholder: el.getAttribute('placeholder') || '',
-            toolbar: [
-                'bold', 'italic', 'strikethrough', 'heading', '|',
-                'quote', 'unordered-list', 'ordered-list', '|',
-                'link', 'image', 'code', 'table', '|',
-                {
-                    // The tasks block (app/Support/Markdown/Tasks) is this project's
-                    // own syntax, so it gets its own button instead of a hidden rule.
-                    name: 'tasks',
-                    action: (editor) => {
-                        editor.codemirror.replaceSelection('```tasks\n\n```');
-                        editor.codemirror.setCursor({ line: editor.codemirror.getCursor().line - 2, ch: 0 });
-                        editor.codemirror.focus();
-                    },
-                    className: 'fa fa-list-check',
-                    title: '할 일 목록 (issue 키 또는 "제목 | 우선순위 | 진행률 | 상태")',
+        let editor;
+        try {
+            editor = new window.EasyMDE({
+                element: el,
+                autoDownloadFontAwesome: false,
+                spellChecker: false,
+                minHeight: '110px',
+                // EasyMDE's own status bar is left alone: an unknown key there is one more
+                // thing its constructor can trip over, and the count belongs to us anyway.
+                status: false,
+                autofocus: false,
+                uploadImage: true,
+                imageAccept: 'image/png,image/jpeg,image/webp,image/gif,image/avif',
+                imageMaxSize: 12 * 1024 * 1024,
+                imageUploadFunction: uploadImage,
+                imageTexts: {
+                    sbInit: '이미지를 끌어다 놓거나 붙여넣으세요 (이 서버에 저장됩니다)',
+                    sbOnDragEnter: '놓으면 업로드합니다',
+                    sbOnDrop: '업로드 중…',
+                    sbProgress: '업로드 중… (#file_progress#)',
+                    sbOnUploaded: '업로드 완료',
+                    sizeUnits: ' KB, MB',
                 },
-                '|', 'preview', 'fullscreen', 'guide',
-            ],
-            previewRender: (plainText) => {
-                // EasyMDE wants a string back synchronously, so the server's answer
-                // replaces the pane once it lands. The debounce keeps side-by-side
-                // mode from firing a request per keystroke; the preview is still the
-                // saved output's renderer, never a second client-side parser.
-                const pane = () => el.closest('.EasyMDEContainer')?.querySelector('.editor-preview-side, .editor-preview');
-                const seed = pane()?.innerHTML || '<p class="muted">{{ __('ui.common.loading') }}</p>';
-
-                clearTimeout(el._previewTimer);
-                el._previewTimer = setTimeout(() => {
-                    fetch('{{ route('markdown.preview') }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                            'Accept': 'application/json',
+                placeholder: el.getAttribute('placeholder') || '',
+                toolbar: [
+                    'bold', 'italic', 'strikethrough', 'heading', '|',
+                    'quote', 'unordered-list', 'ordered-list', '|',
+                    'link', 'image', 'code', 'table', '|',
+                    {
+                        // The tasks block (app/Support/Markdown/Tasks) is this project's
+                        // own syntax, so it gets its own button instead of a hidden rule.
+                        name: 'tasks',
+                        action: (editor) => {
+                            editor.codemirror.replaceSelection('```tasks\n\n```');
+                            editor.codemirror.setCursor({ line: editor.codemirror.getCursor().line - 2, ch: 0 });
+                            editor.codemirror.focus();
                         },
-                        body: JSON.stringify({ text: plainText }),
-                    })
-                        .then((res) => (res.ok ? res.json() : { html: '' }))
-                        .then((data) => {
-                            const target = pane();
-                            if (target) {
-                                // The markdown classes are what give the preview the same
-                                // typography as the saved document.
-                                target.classList.add('markdown');
-                                target.innerHTML = data.html || '';
-                            }
-                        })
-                        .catch(() => {});
-                }, 250);
+                        className: 'fa fa-list-check',
+                        title: '할 일 목록 (issue 키 또는 "제목 | 우선순위 | 진행률 | 상태")',
+                    },
+                    '|', 'preview', 'fullscreen', 'guide',
+                ],
+                previewRender: (plainText) => {
+                    // EasyMDE wants a string back synchronously, so the server's answer
+                    // replaces the pane once it lands. The debounce keeps side-by-side
+                    // mode from firing a request per keystroke; the preview is still the
+                    // saved output's renderer, never a second client-side parser.
+                    const pane = () => el.closest('.EasyMDEContainer')?.querySelector('.editor-preview-side, .editor-preview');
+                    const seed = pane()?.innerHTML || '<p class="muted">{{ __('ui.common.loading') }}</p>';
 
-                return seed;
-            },
-        });
+                    clearTimeout(el._previewTimer);
+                    el._previewTimer = setTimeout(() => {
+                        fetch('{{ route('markdown.preview') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ text: plainText }),
+                        })
+                            .then((res) => (res.ok ? res.json() : { html: '' }))
+                            .then((data) => {
+                                const target = pane();
+                                if (target) {
+                                    // The markdown classes are what give the preview the same
+                                    // typography as the saved document.
+                                    target.classList.add('markdown');
+                                    target.innerHTML = data.html || '';
+                                }
+                            })
+                            .catch(() => {});
+                    }, 250);
+
+                    return seed;
+                },
+            });
+        } catch (error) {
+            // A half-built editor (toolbar rendered, textarea still raw) is worse than a
+            // plain textarea: say so loudly and leave the element usable.
+            console.error('markdown editor failed to initialise', error);
+            el.dataset.mdeReady = '0';
+            el.dataset.mdeFailed = '1';
+
+            return;
+        }
 
         // Live preview: styled tokens, markers only on the caret's line.
         wrLivePreview(editor);
