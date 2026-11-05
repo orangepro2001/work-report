@@ -1,0 +1,16 @@
+{
+  "name": "work-report-assets",
+  "private": true,
+  "description": "Client bundle for real-time document editing (docs/documents.md). Everything else is vendored under public/assets/vendor.",
+  "scripts": {
+    "build": "esbuild resources/js/collab.js --bundle --minify --format=iife --target=es2020 --outfile=public/assets/collab.js"
+  },
+  "dependencies": {
+    "y-codemirror": "^1.0.2",
+    "y-websocket": "^2.0.4",
+    "yjs": "^13.6.20"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

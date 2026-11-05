@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.7
+#
+# The Yjs sync service (docs/documents.md). A separate container because it is a
+# long-lived Node process; the PHP image stays PHP.
+#
+#   podman build -f deploy/collab/Containerfile -t localhost/work-report-collab:current .
+FROM docker.io/library/node:22-alpine
+
+WORKDIR /app
+
+COPY deploy/collab/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+
+COPY deploy/collab/server.cjs deploy/collab/auth.cjs ./
+
+ENV HOST=0.0.0.0 \
+    PORT=1234 \
+    NODE_ENV=production
+
+USER node
+EXPOSE 1234
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -q -O- http://127.0.0.1:1234/healthz >/dev/null || exit 1
+
+CMD ["node", "server.cjs"]

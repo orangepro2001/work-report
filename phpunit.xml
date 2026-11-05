@@ -36,5 +36,7 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- Shared with the Yjs service; a fixed value keeps tokens verifiable here. -->
+        <env name="COLLAB_SECRET" value="test-collab-secret"/>
     </php>
 </phpunit>

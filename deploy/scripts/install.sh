@@ -44,13 +44,18 @@ if ! podman volume exists "$WRP_NAME-storage"; then
     log "created volume $WRP_NAME-storage (document images)"
 fi
 
+ensure_collab_secret
+
 ver=$(src_version)
 build_image "$ver"
+build_collab_image
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 
 render_quadlet
 render_backup_units
+render_collab_units
 systemctl --user daemon-reload
+systemctl --user start "$WRP_NAME-collab.service"
 systemctl --user start "$WRP_NAME.service"
 wait_healthy 120 || { journalctl --user -u "$WRP_NAME" -n 60 --no-pager; die "service did not become healthy"; }
 

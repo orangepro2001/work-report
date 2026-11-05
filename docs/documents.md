@@ -32,21 +32,43 @@ Every save writes a revision, including a restore, so undoing an undo is possibl
 
 ## Live collaboration
 
-Two layers, on purpose:
+Two layers, and both stay:
 
-1. **Presence and change detection (shipped).** The editor polls
-   `GET /docs/{slug}/state` every 2.5 s. The same call renews this member's
-   `document_presences` row (45 s TTL, so a closed tab ages out by itself) and
-   returns who else is reading. If the revision moved and this browser has no
-   unsaved text, the newer body is pulled in silently; if there *is* unsaved text,
-   the conflict bar appears instead.
-2. **CRDT editing (next).** Yjs over a `y-websocket` service gives character-level
-   merging. The client is the one place a JavaScript build is justified: `yjs`,
-   `y-websocket` and the CodeMirror-5 binding only ship as a module graph, so they
-   are bundled by esbuild in a `node` stage of `deploy/Containerfile`
-   (AGENTS.md no longer forbids this — the constraint was a repo note, and the owner
-   does not require it). The body then stops travelling through the poll above; the
-   revision history, the conflict bar and the presence list stay as they are.
+1. **CRDT editing (Yjs, shipped).** Two browsers in a document's room merge
+   keystrokes character by character instead of overwriting each other. The room is
+   the document slug; `y-websocket` carries the updates.
+2. **Persistence and presence (this application).** The autosave still writes the
+   merged text to `documents.body` and appends a revision, and the 2.5 s poll still
+   renews presence and reports who is reading. With the room live, the poll no
+   longer applies the server's body — the CRDT is the truth — and a 409 is answered
+   by adopting the newer revision and saving once more, because the browser already
+   holds the other person's keystrokes.
+
+### The service
+
+| Piece | Where |
+|---|---|
+| Sync service | `deploy/collab/` — Node 22, `y-websocket` + a 60-line server, its own container `work-report-collab` on `127.0.0.1:1234` |
+| Proxy | the application's nginx, `location /collab/` → `127.0.0.1:1234` with upgrade headers (no new public port) |
+| Authorization | `POST /docs/{slug}/collab` decides once, with the editor's own rules, and returns a signed token |
+| Token | `App\Support\CollabToken` — `base64url({room, sub, exp})` + HMAC-SHA256 with `COLLAB_SECRET`, 15 minutes |
+| Check | `deploy/collab/auth.cjs` verifies the signature and that the token's room is the room being joined |
+
+A viewer (share role `viewer`) gets `{editable: false}` and no token, so "can read
+the page" never becomes "can type into it". A forged or expired token closes the
+socket with 4001.
+
+The service keeps nothing on disk: the text lives in Postgres through the autosave,
+so a restart costs at most the keystrokes of a document nobody has saved yet.
+
+### Building the client
+
+`resources/js/collab.js` is the only source that needs a bundler (`yjs`,
+`y-websocket`, `y-codemirror` — a module graph, and hand-vendoring it is exactly the
+fragility AGENTS.md warns about). The `assets` stage of `deploy/Containerfile`
+builds it with npm + esbuild on Debian (esbuild's binary is glibc), and the runtime
+image just receives `public/assets/collab.js`. A checkout without the bundle simply
+keeps the editor in polling mode.
 
 ## Images: local, and never public
 

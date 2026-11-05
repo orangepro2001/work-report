@@ -93,3 +93,37 @@ render_backup_units() {
     sed -e "s/@NAME@/$WRP_NAME/g" \
         "$WRP_SRC/deploy/systemd/work-report-backup-offsite.timer" > "$dir/$WRP_NAME-backup-offsite.timer"
 }
+
+# The Yjs sync service (docs/documents.md) is part of the stack, not an extra the
+# operator has to remember: rendered with the instance name like everything else.
+render_collab_units() {
+    mkdir -p "$QUADLET_DIR"
+    sed -e "s/work-report-collab/$WRP_NAME-collab/g" \
+        -e "s#%h/.config/work-report/collab.env#%h/.config/$WRP_NAME/collab.env#" \
+        "$WRP_SRC/deploy/quadlet/work-report-collab.container" > "$QUADLET_DIR/$WRP_NAME-collab.container"
+}
+
+build_collab_image() {
+    log "building localhost/$WRP_NAME-collab:current"
+    podman build -q --format docker -f "$WRP_SRC/deploy/collab/Containerfile" \
+        -t "localhost/$WRP_NAME-collab:current" "$WRP_SRC" >/dev/null
+}
+
+# Two secrets have to agree across containers: the room-token secret (app ↔ Yjs
+# service). One file each, generated once.
+ensure_collab_secret() {
+    mkdir -p "$CONF_DIR"
+    if [ ! -f "$CONF_DIR/collab.env" ]; then
+        printf 'COLLAB_SECRET=%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 43)" > "$CONF_DIR/collab.env"
+        chmod 600 "$CONF_DIR/collab.env"
+        log "generated $CONF_DIR/collab.env"
+    fi
+
+    local secret
+    secret=$(sed -n 's/^COLLAB_SECRET=//p' "$CONF_DIR/collab.env")
+
+    if [ -f "$CONF_DIR/env" ] && ! grep -q '^COLLAB_SECRET=' "$CONF_DIR/env"; then
+        printf '\n# Shared with the Yjs service; signs the short-lived room token.\nCOLLAB_SECRET=%s\n' "$secret" >> "$CONF_DIR/env"
+        log "added COLLAB_SECRET to $CONF_DIR/env"
+    fi
+}

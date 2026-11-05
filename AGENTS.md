@@ -60,8 +60,9 @@ python3 tools/inspect_xlsx.py docs/source-rev02.xlsx > /tmp/dump.json
 
 Deploy: `bash deploy/scripts/upgrade.sh` (builds, health-checks, rolls back on
 failure). Production: <https://egg.tail9f7f1f.ts.net/report>. Two Quadlet units run
-on that host: `work-report` (the app, 0.0.0.0:3560) and `work-report-db`
-(PostgreSQL, 127.0.0.1:5433). The database's standby copy is one dump file mirrored
+on that host: `work-report` (the app, 0.0.0.0:3560), `work-report-db` (PostgreSQL,
+127.0.0.1:5433) and `work-report-collab` (the Yjs sync service, 127.0.0.1:1234,
+proxied by the app's nginx at `/collab/`). The database's standby copy is one dump file mirrored
 to the `AI` host every night (`deploy/scripts/backup-offsite.sh`, timer
 `work-report-backup-offsite`); the connection is push-only, from here.
 

@@ -1,5 +1,15 @@
 @extends('layouts.app')
 
+@push('head')
+    {{-- The one bundled asset (npm + esbuild, docs/documents.md). Only the document
+         editor needs it, so the board does not pay for it — and it is absent in a
+         checkout that has not run the build, which simply leaves the editor in
+         polling mode. --}}
+    @if (is_file(public_path('assets/collab.js')))
+        <script src="{{ wr_asset('assets/collab.js') }}?v={{ substr(md5_file(public_path('assets/collab.js')), 0, 8) }}" defer></script>
+    @endif
+@endpush
+
 @section('title', $document->title)
 
 @section('content')
@@ -9,6 +19,7 @@
             'editable' => $editable,
             'stateUrl' => route('docs.state', $document),
             'saveUrl' => route('docs.update', $document),
+            'collabUrl' => route('docs.collab', $document),
             'labelSaved' => __('ui.docs.saved'),
             'labelConflict' => __('ui.docs.conflict'),
             'labelError' => __('ui.docs.save_failed'),
@@ -145,6 +156,8 @@ function documentEditor(id, spec) {
         readers: spec.readers,
         timer: null,
 
+        collab: false,
+
         init() {
             setInterval(() => this.poll(), 2500);
 
@@ -152,6 +165,71 @@ function documentEditor(id, spec) {
                 if (e.target.id !== 'doc-body') return;
                 this.dirty = true;
                 this.queueSave();
+            });
+
+            this.startCollab();
+        },
+
+        /*
+         * Real-time layer: two browsers in the same room merge keystrokes through
+         * Yjs instead of overwriting each other. The room is per document, and the
+         * token comes from the application, which is where "may I edit this?" was
+         * decided. The autosave above stays: it is what puts the merged text into
+         * Postgres and into the revision history.
+         */
+        async startCollab() {
+            if (!this.editable || !window.WRCollab) return;
+
+            let data;
+            try {
+                const res = await fetch(spec.collabUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                if (!res.ok) return;
+                data = await res.json();
+            } catch (e) {
+                return;
+            }
+
+            if (!data.token) return;
+
+            const { Y, WebsocketProvider, CodeMirrorBinding } = window.WRCollab;
+            const editor = this.editor();
+            if (!editor) return;
+
+            this.ydoc = new Y.Doc();
+            this.provider = new WebsocketProvider(
+                (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + data.url,
+                data.room,
+                this.ydoc,
+                { params: { token: data.token } },
+            );
+
+            const ytext = this.ydoc.getText('body');
+
+            this.provider.on('sync', (synced) => {
+                if (!synced) return;
+
+                // First person in the room seeds it with what Postgres holds.
+                if (ytext.length === 0 && this.body() !== '') {
+                    ytext.insert(0, this.body());
+                }
+
+                if (!this.binding) {
+                    this.binding = new CodeMirrorBinding(ytext, editor.codemirror, this.provider.awareness);
+                    this.collab = true;
+                    this.status = 'r' + this.revision + ' · live';
+                }
+            });
+
+            this.provider.on('status', (event) => {
+                if (event.status === 'disconnected' && this.collab) {
+                    this.status = 'r' + this.revision + ' · offline';
+                }
             });
         },
 
@@ -195,6 +273,15 @@ function documentEditor(id, spec) {
 
             if (res.status === 409) {
                 const data = await res.json();
+
+                // With the CRDT live, the text in this browser already contains the
+                // other person's keystrokes: adopt the newer revision and persist
+                // once more instead of asking the person to resolve anything.
+                if (this.collab) {
+                    this.revision = data.revision;
+                    return this.save(explicit);
+                }
+
                 this.status = spec.labelConflict + (data.edited_by ? ' — ' + data.edited_by : '');
                 this.offerReload(data);
                 return;
@@ -241,6 +328,13 @@ function documentEditor(id, spec) {
             this.readers = data.readers || [];
 
             if (data.revision <= this.revision) return;
+
+            // The body is merged by the CRDT while the room is live; the poll is then
+            // only about the revision number and the reader list.
+            if (this.collab) {
+                if (!this.dirty) this.revision = data.revision;
+                return;
+            }
 
             if (this.dirty) {
                 // Keep what is being typed; offer the newer text instead of applying it.

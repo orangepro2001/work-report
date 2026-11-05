@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{{ wr_asset('assets/vendor/easymde/easymde.min.css') }}?v={{ substr(md5_file(public_path('assets/vendor/easymde/easymde.min.css')), 0, 8) }}">
     <link rel="stylesheet" href="{{ wr_asset('assets/app.css') }}?v={{ substr(md5_file(public_path('assets/app.css')), 0, 8) }}">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f5597'/><text x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'>업</text></svg>">
+    @stack('head')
     <script src="{{ wr_asset('assets/vendor/easymde/easymde.min.js') }}?v={{ substr(md5_file(public_path('assets/vendor/easymde/easymde.min.js')), 0, 8) }}" defer></script>
     <script src="{{ wr_asset('assets/vendor/alpine.min.js') }}?v={{ substr(md5_file(public_path('assets/vendor/alpine.min.js')), 0, 8) }}" defer></script>
 </head>

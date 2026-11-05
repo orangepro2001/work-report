@@ -21,3 +21,7 @@
 *.log
 /.cache
 /gen.php
+
+# Built by the `assets` stage of deploy/Containerfile (npm + esbuild).
+/public/assets/collab.js
+/node_modules

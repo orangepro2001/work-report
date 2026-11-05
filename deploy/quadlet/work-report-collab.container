@@ -1,0 +1,40 @@
+# Quadlet unit for the Yjs sync service behind the document editor
+# (docs/documents.md). Installed by deploy/scripts/install.sh into
+# ~/.config/containers/systemd/.
+#
+# It holds no data: document text is persisted by the application's own revision
+# save, so restarting this container loses only unsaved keystrokes of a document
+# nobody has typed into for a while.
+
+[Unit]
+Description=work-report Yjs sync service (document co-editing)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/work-report-collab:current
+ContainerName=work-report-collab
+# Loopback only: the application's nginx proxies /collab/ to it. The public entry
+# point stays on port 3560, so no new port is exposed anywhere.
+PublishPort=127.0.0.1:1234:1234
+EnvironmentFile=%h/.config/work-report/collab.env
+Environment=HOST=0.0.0.0
+ReadOnly=true
+Tmpfs=/tmp
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=["wget","-q","-O-","http://127.0.0.1:1234/healthz"]
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+LogDriver=journald
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

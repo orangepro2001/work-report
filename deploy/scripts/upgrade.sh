@@ -7,6 +7,8 @@ source "$(dirname "$0")/lib.sh"
 
 ver=${1:-$(src_version)}
 build_image "$ver"
+ensure_collab_secret
+build_collab_image
 
 prev=$(podman image inspect "$WRP_IMAGE:current" --format '{{.Id}}' 2>/dev/null || true)
 if [ -n "$prev" ] && [ "$prev" = "$(podman image inspect "$WRP_IMAGE:$ver" --format '{{.Id}}')" ]; then
@@ -14,7 +16,9 @@ if [ -n "$prev" ] && [ "$prev" = "$(podman image inspect "$WRP_IMAGE:$ver" --for
     if ! systemctl --user is-active -q "$WRP_NAME.service"; then
         render_quadlet
         render_backup_units
+        render_collab_units
         systemctl --user daemon-reload
+        systemctl --user restart "$WRP_NAME-collab.service"
         systemctl --user start "$WRP_NAME.service"
         wait_healthy 120 || die "$WRP_NAME did not become healthy"
     fi
@@ -25,7 +29,9 @@ fi
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 render_quadlet
 render_backup_units
+render_collab_units
 systemctl --user daemon-reload
+systemctl --user restart "$WRP_NAME-collab.service"
 systemctl --user restart "$WRP_NAME.service"
 
 if wait_healthy 120; then

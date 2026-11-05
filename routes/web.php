@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BoardController;
+use App\Http\Controllers\CollabTokenController;
 use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\DocumentsController;
 use App\Http\Controllers\ExportController;
@@ -52,6 +53,8 @@ Route::middleware(RequireActor::class)->group(function () {
     Route::get('/docs/{document:slug}', [DocumentsController::class, 'show'])->name('docs.show');
     Route::patch('/docs/{document:slug}', [DocumentsController::class, 'update'])->name('docs.update');
     Route::get('/docs/{document:slug}/state', [DocumentsController::class, 'state'])->name('docs.state');
+    // The pass for the real-time room; authorisation happens here, once.
+    Route::post('/docs/{document:slug}/collab', CollabTokenController::class)->name('docs.collab');
     Route::post('/docs/{document:slug}/restore/{revision}', [DocumentsController::class, 'restore'])->name('docs.restore');
     Route::post('/docs/{document:slug}/share', [DocumentsController::class, 'share'])->name('docs.share');
     Route::delete('/docs/{document:slug}/share/{member}', [DocumentsController::class, 'unshare'])->name('docs.unshare');

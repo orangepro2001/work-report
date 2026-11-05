@@ -4,6 +4,8 @@
 source "$(dirname "$0")/lib.sh"
 
 systemctl --user stop "$WRP_NAME.service" 2>/dev/null || true
+systemctl --user stop "$WRP_NAME-collab.service" 2>/dev/null || true
+rm -f "$QUADLET_DIR/$WRP_NAME-collab.container"
 podman rm -f "$WRP_NAME" >/dev/null 2>&1 || true
 rm -f "$QUADLET_DIR/$WRP_NAME.container"
 

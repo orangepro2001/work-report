@@ -21,6 +21,16 @@ return [
      * paths below are fixed by that service's DESIGN.md (its discovery document
      * publishes the same values).
      */
+    /*
+     * Real-time document editing (docs/documents.md). `secret` is shared with the
+     * Yjs service only: it signs the short-lived room token, and the sync service
+     * verifies it with the same value.
+     */
+    'collab' => [
+        'secret' => env('COLLAB_SECRET'),
+        'url' => env('COLLAB_URL', '/collab'),
+    ],
+
     'sso' => [
         'issuer' => rtrim((string) env('SSO_ISSUER', 'https://521985.xyz/sso'), '/'),
 

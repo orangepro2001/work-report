@@ -142,6 +142,14 @@ rather than a regex. The editor is EasyMDE, vendored under
 its preview pane calls `POST /markdown`, so the preview is the saved output rather
 than a second, differently-behaved client-side parser.
 
+## Real-time editing
+
+Documents are edited together: Yjs merges keystrokes in a room per document, the
+application's autosave persists the merged text with a revision, and a signed token
+(issued after the usual permission check) is what lets a browser join. The sync
+service is its own container (`work-report-collab`, loopback only, proxied at
+`/collab/`). See [docs/documents.md](docs/documents.md).
+
 ## Docs
 
 - [docs/excel-schema.md](docs/excel-schema.md) — the workbook, extracted and specified

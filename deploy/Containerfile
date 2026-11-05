@@ -10,6 +10,24 @@
 ARG PHP_VERSION=8.4
 
 ###############################################################################
+# Stage 0 — JS bundle (real-time document editing, docs/documents.md)
+#
+# The only JavaScript that needs assembling: `yjs`, `y-websocket` and the CodeMirror
+# binding ship as a module graph. Debian (glibc), not Alpine: esbuild's prebuilt
+# binary is what runs here, and this stage never reaches the runtime image.
+###############################################################################
+FROM docker.io/library/node:22-bookworm-slim AS assets
+
+WORKDIR /app
+# .npmrc sets ignore-scripts=true for the whole repository; esbuild needs its
+# postinstall to place the platform binary.
+ENV npm_config_ignore_scripts=false
+COPY package.json ./
+RUN npm install --no-audit --no-fund
+COPY resources/js ./resources/js
+RUN npm run build
+
+###############################################################################
 # Stage 1 — composer dependencies (dev toolchain only for the vendor dir)
 ###############################################################################
 FROM docker.io/library/composer:2 AS vendor
@@ -55,6 +73,7 @@ COPY deploy/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint
 
 COPY --from=vendor --chown=root:root /app /app
+COPY --from=assets --chown=root:root /app/public/assets/collab.js /app/public/assets/collab.js
 
 WORKDIR /app
 
