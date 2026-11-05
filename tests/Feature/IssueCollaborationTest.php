@@ -166,10 +166,34 @@ class IssueCollaborationTest extends TestCase
             ->get('/auth/sso/callback?state=theirs&code=abc')
             ->assertRedirect(route('sso.redirect'));
 
-        // Third consecutive failure: stop bouncing and explain.
+        // Third consecutive failure: drop the stale session and hand the person to
+        // the SSO's own sign-in page instead of bouncing again.
         $this->withSession(['oidc.state' => 'ours', 'oidc.restarts' => 2])
             ->get('/auth/sso/callback?state=theirs&code=abc')
-            ->assertForbidden();
+            ->assertRedirect('https://521985.xyz/sso/login');
+    }
+
+    /**
+     * A session that cannot identify anybody is dropped before signing in, so the
+     * SSO is never handed a state from a previous, broken round trip.
+     */
+    public function test_a_stale_session_is_cleared_before_signing_in(): void
+    {
+        $this->withSession([
+            'oidc.state' => 'from-an-old-round-trip',
+            'oidc.restarts' => 2,
+            'oidc.claims' => ['iss' => 'x', 'sub' => ''],   // present but unusable
+            'wr.actor_id' => 3,
+        ]);
+
+        $this->get('/list?status=done')->assertRedirect(route('sso.redirect'));
+
+        $this->assertNull(session('oidc.state'));
+        $this->assertNull(session('oidc.restarts'));
+        $this->assertNull(session('oidc.claims'));
+        $this->assertNull(session('wr.actor_id'));
+        // …except where the person was going.
+        $this->assertSame(url('/list?status=done'), session('url.intended'));
     }
 
     public function test_a_successful_callback_clears_the_restart_counter(): void
@@ -267,6 +291,41 @@ class IssueCollaborationTest extends TestCase
         $this->withSession(['oidc.state' => 'st'])
             ->get('/auth/sso/callback?state=st&code=abc')
             ->assertRedirect(url('/list?status=done'));
+    }
+
+    /**
+     * A stale intended URL must not become the landing page: before the mount
+     * prefix was fixed, browsers were sent to https://host/board, and the portal
+     * answered that with "404 page not found".
+     */
+    public function test_a_foreign_intended_url_is_not_replayed(): void
+    {
+        config([
+            'workreport.sso.issuer' => 'https://sso.test/sso',
+            'workreport.sso.internal_base' => 'http://127.0.0.1:3550',
+            'workreport.sso.redirect_uri' => 'https://board.test/report/auth/sso/callback',
+        ]);
+
+        Http::fake([
+            'http://127.0.0.1:3550/oauth/token' => Http::response(['access_token' => 'tok']),
+            'http://127.0.0.1:3550/oauth/userinfo' => Http::response(['sub' => 'sub-1', 'preferred_username' => 'lee-sungmin']),
+        ]);
+
+        $this->withSession([
+            'oidc.state' => 'st',
+            'url.intended' => 'https://board.test/board',   // no /report prefix
+        ])->get('/auth/sso/callback?state=st&code=abc')
+            ->assertRedirect(route('board'));
+    }
+
+    public function test_logging_out_hands_the_browser_to_the_sso(): void
+    {
+        config(['workreport.sso.issuer' => 'https://sso.test/sso']);
+
+        $this->post('/auth/logout')
+            ->assertRedirect('https://sso.test/sso');
+
+        $this->assertNull(session('oidc.claims'));
     }
 
     public function test_an_unreachable_sso_is_reported_instead_of_a_500(): void

@@ -65,15 +65,37 @@ final class SsoAuthController extends Controller
         $request->session()->forget('oidc.restarts');
         $request->session()->put(OidcActorResolver::SESSION_KEY, $claims);
 
-        return redirect()->intended(route('board'));
+        return redirect()->to($this->landingUrl($request));
+    }
+
+    /**
+     * Where the browser goes after a successful sign-in.
+     *
+     * The stored intended URL is only replayed when it lives under this app's mount
+     * point. Anything else — a value a previous build wrote, a stripped path like
+     * `/board`, or the portal's root — would dump the person on a page this
+     * application does not serve (the portal answers those with "404 page not
+     * found").
+     */
+    private function landingUrl(Request $request): string
+    {
+        $intended = (string) $request->session()->pull('url.intended', '');
+        $root = rtrim(url('/'), '/');
+
+        if ($intended === $root || str_starts_with($intended, $root.'/')) {
+            return $intended;
+        }
+
+        return route('board');
     }
 
     /**
      * Send the browser back through the authorization endpoint.
      *
      * A browser that refuses the session cookie would otherwise bounce between the
-     * two legs forever, so the third consecutive failure becomes a page that says
-     * what to check.
+     * two legs forever, so after two restarts the stale session is dropped outright
+     * and the person is handed to the SSO's own sign-in page — the one place where
+     * a fresh login can be done by hand.
      */
     private function restart(Request $request, bool $sessionHadState): RedirectResponse
     {
@@ -85,9 +107,10 @@ final class SsoAuthController extends Controller
         ]);
 
         if ($attempts > 2) {
-            $request->session()->forget('oidc.restarts');
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-            abort(403, __('ui.identity.state_lost'));
+            return redirect()->away(config('workreport.sso.issuer').'/login');
         }
 
         $request->session()->put('oidc.restarts', $attempts);
@@ -96,16 +119,19 @@ final class SsoAuthController extends Controller
     }
 
     /**
-     * Signing out locally only. The SSO keeps its own session and exposes a
-     * POST-only logout, so a browser that comes back is authenticated silently —
-     * the signed-out page says so instead of pretending otherwise.
+     * Signing out locally, then handing the browser to the SSO.
+     *
+     * The SSO keeps its own session and exposes a POST-only logout, so it cannot be
+     * ended from here. Landing on the issuer — not on this app's root, which a
+     * reverse proxy in front may not even serve — puts the person where signing in
+     * and out actually happens.
      */
     public function logout(Request $request): RedirectResponse
     {
         $request->session()->forget(OidcActorResolver::SESSION_KEY);
         $request->session()->regenerate();
 
-        return redirect()->route('signed-out');
+        return redirect()->away((string) config('workreport.sso.issuer'));
     }
 
     private function authorizeUrl(string $state): string
