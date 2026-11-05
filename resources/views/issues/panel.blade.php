@@ -72,11 +72,18 @@
 
         <dt>{{ __('ui.issue.reporter') }}</dt>
         <dd>
-            <select class="select" style="height:26px;font-size:12.5px" x-on:change="save('reporter_id', $el.value || null)">
-                @foreach ($members as $member)
-                    <option value="{{ $member->id }}" @selected($issue->reporter_id === $member->id)>{{ $member->name }}</option>
+            {{-- Free text: the team is three people, but a report is often addressed by
+                 somebody outside it. Known names are offered, unknown ones become
+                 name-only contacts (Member::forName). --}}
+            <input class="input" style="height:26px;font-size:12.5px" list="reporter-options"
+                   value="{{ $issue->reporter?->name }}" maxlength="120"
+                   placeholder="{{ __('ui.issue.reporter_placeholder') }}"
+                   x-on:change="save('reporter_name', $el.value)">
+            <datalist id="reporter-options">
+                @foreach ($reporters as $reporter)
+                    <option value="{{ $reporter->name }}">{{ $reporter->is_external ? __('ui.issue.external') : '' }}</option>
                 @endforeach
-            </select>
+            </datalist>
         </dd>
 
         <dt>{{ __('ui.issue.starts') }}</dt>

@@ -42,7 +42,10 @@ class IssueController extends Controller
             'issue' => $issue,
             'statuses' => config('workreport.statuses'),
             'priorities' => config('workreport.priorities'),
-            'members' => Member::active()->get(['id', 'name', 'color']),
+            'members' => Member::active()->internal()->orderBy('position')->get(['id', 'name', 'color']),
+            // Reporters may be people without an account, so the field is free text
+            // with these names offered as suggestions.
+            'reporters' => Member::active()->orderBy('name')->get(['id', 'name', 'is_external']),
             'notes' => config('workreport.note_presets'),
         ]);
     }
@@ -125,12 +128,22 @@ class IssueController extends Controller
             'percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'assignee_id' => ['sometimes', 'nullable', 'integer', 'exists:members,id'],
             'reporter_id' => ['sometimes', 'nullable', 'integer', 'exists:members,id'],
+            // A reporter may be somebody outside the team: a name is enough. It is
+            // stored as a name-only member row, so the workbook column and every
+            // foreign key keep working (docs/documents.md → people).
+            'reporter_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'starts_on' => ['sometimes', 'nullable', 'date'],
             'due_on' => ['sometimes', 'nullable', 'date'],
             'due_undecided' => ['sometimes', 'boolean'],
             'note' => ['sometimes', 'nullable', 'string', 'max:300'],
             'flagged' => ['sometimes', 'boolean'],
         ]);
+
+        if (array_key_exists('reporter_name', $data)) {
+            $name = trim((string) $data['reporter_name']);
+            unset($data['reporter_name']);
+            $data['reporter_id'] = $name === '' ? null : Member::forName($name)->id;
+        }
 
         $actor = $this->actors->current();
         $changes = [];

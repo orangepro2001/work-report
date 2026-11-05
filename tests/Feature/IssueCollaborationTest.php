@@ -346,6 +346,50 @@ class IssueCollaborationTest extends TestCase
             ->assertSessionHas('status', __('ui.identity.unreachable'));
     }
 
+    public function test_an_outsider_can_be_named_as_the_reporter(): void
+    {
+        $issue = Issue::firstOrFail();
+
+        $json = $this->patchJson("/issues/{$issue->id}", ['reporter_name' => '김철수 과장'])->assertOk()->json();
+
+        $reporter = Member::where('name', '김철수 과장')->firstOrFail();
+        $this->assertTrue($reporter->is_external);
+        $this->assertNull($reporter->oidc_subject);
+        $this->assertSame($reporter->id, $issue->fresh()->reporter_id);
+        $this->assertSame($reporter->id, $json['issue']['reporter_id']);
+    }
+
+    public function test_the_same_outside_name_is_reused_not_duplicated(): void
+    {
+        $first = Issue::orderBy('id')->firstOrFail();
+        $second = Issue::orderByDesc('id')->firstOrFail();
+
+        $this->patchJson("/issues/{$first->id}", ['reporter_name' => '박영희'])->assertOk();
+        $this->patchJson("/issues/{$second->id}", ['reporter_name' => '박영희'])->assertOk();
+
+        $this->assertSame(1, Member::where('name', '박영희')->count());
+    }
+
+    public function test_an_outside_reporter_is_never_offered_as_an_assignee(): void
+    {
+        $issue = Issue::firstOrFail();
+        $this->patchJson("/issues/{$issue->id}", ['reporter_name' => '김철수 과장'])->assertOk();
+
+        $html = (string) $this->get("/issues/{$issue->id}")->assertOk()->getContent();
+
+        // The reporter field carries the typed name…
+        $this->assertStringContainsString('value="김철수 과장"', $html);
+
+        // …while the assignee picker is a <select> of accounts only: as many options
+        // as there are internal people, and the outsider is not one of them.
+        $internal = Member::active()->internal()->count();
+        $options = preg_match_all('/<option value="\d+"[^>]*>[^<]+<\/option>/', $html, $matches) ? $matches[0] : [];
+        $this->assertCount($internal, $options);
+        foreach ($options as $option) {
+            $this->assertStringNotContainsString('김철수 과장', $option);
+        }
+    }
+
     public function test_the_reporter_can_be_changed(): void
     {
         $issue = Issue::firstOrFail();

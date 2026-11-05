@@ -48,7 +48,7 @@ class DailyReportController extends Controller
         $view = view('report.daily', [
             'date' => $date,
             'member' => $member,
-            'members' => Member::active()->get(['id', 'name', 'color']),
+            'members' => Member::active()->internal()->get(['id', 'name', 'color']),
             'projects' => Project::visible()->get(['id', 'name', 'abbr', 'color']),
             'issues' => $issues,
             'log' => $log,

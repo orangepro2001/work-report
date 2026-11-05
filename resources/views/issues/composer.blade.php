@@ -1,6 +1,6 @@
 @php
     $projects = \App\Models\Project::visible()->get(['id', 'name', 'abbr', 'color']);
-    $members = \App\Models\Member::active()->get(['id', 'name', 'color']);
+    $members = \App\Models\Member::active()->internal()->get(['id', 'name', 'color']);
     $actor = app(\App\Contracts\ActorResolver::class)->current();
 @endphp
 

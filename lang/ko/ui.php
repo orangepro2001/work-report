@@ -53,6 +53,8 @@ return [
         'priority' => '우선순위',
         'status' => '상태',
         'percent' => '진행률',
+        'reporter_placeholder' => '이름을 적으세요 (팀 외 인물도 가능)',
+        'external' => '외부',
         'starts' => '시작일',
         'due' => '예정일',
         'note' => '비고',

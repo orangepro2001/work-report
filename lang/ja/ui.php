@@ -48,6 +48,8 @@ return [
         'priority' => '優先度',
         'status' => '状態',
         'percent' => '進捗率',
+        'reporter_placeholder' => '名前を入力（チーム外でも可）',
+        'external' => '外部',
         'starts' => '開始日',
         'due' => '予定日',
         'note' => '備考',

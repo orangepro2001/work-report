@@ -37,7 +37,7 @@ class BoardController extends Controller
         $filters = $this->filters($request);
 
         $projects = Project::visible()->get(['id', 'name', 'abbr', 'color', 'position']);
-        $members = Member::active()->get(['id', 'name', 'color', 'position']);
+        $members = Member::active()->internal()->get(['id', 'name', 'color', 'position']);
 
         // Reporter is only rendered in the list lens, so the board and backlog skip
         // that join: one fewer round trip over the tailnet (docs/perf.md).

@@ -49,6 +49,8 @@ return [
         'priority' => 'Priority',
         'status' => 'Status',
         'percent' => 'Progress',
+        'reporter_placeholder' => 'Type a name — outside the team is fine',
+        'external' => 'external',
         'starts' => 'Start',
         'due' => 'Due',
         'note' => 'Note',

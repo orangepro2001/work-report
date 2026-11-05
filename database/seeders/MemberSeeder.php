@@ -10,12 +10,19 @@ use Illuminate\Database\Seeder;
  * People, projects and reporting lines taken from the reference workbook
  * (docs/source-rev02.xlsx, sheet 목록, rows 6-20).
  *
- * Idempotent: safe to run on every boot, which is what the container does.
+ * The container runs the seeders on every boot, so this one has to be *harmless* when
+ * it runs again — not merely idempotent. A member the team deleted (a placeholder from
+ * the workbook, somebody who left) must not come back on the next restart, so seeding
+ * only happens while the table is still empty.
  */
 class MemberSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Member::query()->exists()) {
+            return;
+        }
+
         $members = [
             ['name' => '이성민', 'key' => 'lee-sungmin', 'title' => '팀장', 'color' => '#2F5597', 'position' => 1],
             ['name' => '정태훈', 'key' => 'jung-taehun', 'title' => '선임', 'color' => '#C65911', 'position' => 2],

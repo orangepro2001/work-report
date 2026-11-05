@@ -17,6 +17,12 @@ class IssueSeeder extends Seeder
 {
     public function run(): void
     {
+        // Same rule as MemberSeeder: a deleted issue stays deleted. The fixture fills
+        // an empty board once, it does not police it afterwards.
+        if (Issue::query()->exists()) {
+            return;
+        }
+
         $path = database_path('seeders/issues.json');
 
         if (! is_file($path)) {
