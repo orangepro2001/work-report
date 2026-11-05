@@ -77,7 +77,9 @@ the subscriber (all of them, or something is stuck).
 - **DDL.** Migrations run at container boot; after any migration that touches a
   published table, run `resync`.
 - **`sessions` churn.** The table is published (a standby should be able to take
-  over a login), so expect a steady trickle of WAL for it.
+  over a login), so expect a steady trickle of WAL for it. `status` therefore leaves
+  it out of the row-parity comparison — the application writes to it on every
+  request, so two snapshots a second apart differ by design.
 - **Sequences.** Logical replication does not copy sequence values; a takeover must
   `setval()` them (or rely on `IssueKeyGenerator`'s counters, which are a table).
 

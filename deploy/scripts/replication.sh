@@ -37,9 +37,12 @@ remote_psql() { ssh -o BatchMode=yes "$AI" "podman exec -i -u postgres $REMOTE_P
 # One query, one line, for both sides: table row counts as "table=count" pairs.
 parity() {
     local tables local_rows remote_rows
-    tables=$(local_psql -tAc "select tablename from pg_publication_tables where pubname='wr_pub' order by 1")
+    # `sessions` is left out on purpose: the application writes to it on every request,
+    # so two snapshots taken a second apart differ by design. A parity check that cries
+    # wolf is a parity check nobody reads.
+    tables=$(echo "select tablename from pg_publication_tables where pubname='wr_pub' and tablename <> 'sessions' order by 1" | local_psql -tA)
     local_rows=$(echo "select format('%s=%s', tablename, (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', schemaname, tablename), false, true, '')))[1]::text)
-        from pg_publication_tables where pubname='wr_pub' order by 1" | local_psql -tA)
+        from pg_publication_tables where pubname='wr_pub' and tablename <> 'sessions' order by 1" | local_psql -tA)
     remote_list=$(echo "$tables" | sed "s/.*/'&'/" | paste -sd, -)
     remote_rows=$(echo "select format('%s=%s', tablename, (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', schemaname, tablename), false, true, '')))[1]::text)
         from pg_tables where schemaname='public' and tablename in ($remote_list) order by 1" | remote_psql -tA | tr -d ' ')
