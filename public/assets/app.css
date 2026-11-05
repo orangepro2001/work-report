@@ -1012,3 +1012,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .panel-page { max-width: 900px; margin: 0 auto; }
 .panel-page .card { box-shadow: var(--shadow-1); }
+
+/* ── Markdown live preview (CodeMirror 5) ─────────────────────────────────────
+   Obsidian's trick, at the size this app needs: the text keeps its source, but the
+   tokens are styled and the syntax markers are hidden on every line except the one
+   the caret is on. Nothing here changes the document — marks are view-only, so the
+   Yjs binding and the saved text are untouched. */
+
+.cm-s-easymde .cm-header, .EasyMDEContainer .cm-header { font-weight: 700; color: var(--ink); line-height: 1.3; }
+.EasyMDEContainer .cm-header-1 { font-size: 1.5em; }
+.EasyMDEContainer .cm-header-2 { font-size: 1.3em; }
+.EasyMDEContainer .cm-header-3 { font-size: 1.15em; }
+.EasyMDEContainer .cm-header-4,
+.EasyMDEContainer .cm-header-5,
+.EasyMDEContainer .cm-header-6 { font-size: 1.03em; }
+
+.EasyMDEContainer .cm-strong { font-weight: 700; color: var(--ink); }
+.EasyMDEContainer .cm-em { font-style: italic; }
+.EasyMDEContainer .cm-link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.EasyMDEContainer .cm-url { color: var(--faint); font-size: .92em; }
+.EasyMDEContainer .cm-quote { color: var(--ink-2); font-style: italic; border-left: 3px solid var(--hair-strong); padding-left: 8px; }
+.EasyMDEContainer .cm-strikethrough { text-decoration: line-through; color: var(--muted); }
+
+/* A hidden marker keeps its width (font-size: 0), so the caret does not jump. */
+.EasyMDEContainer .cm-md-hidden { font-size: 0; opacity: 0; }
+
+/* An inline image on a line that is not being edited. */
+.EasyMDEContainer .cm-md-image {
+    display: inline-block; max-height: 220px; max-width: 100%; vertical-align: bottom;
+    border-radius: var(--radius-sm); border: 1px solid var(--hair); margin: 2px 0;
+}

@@ -414,6 +414,85 @@ window.refreshLiveRegion = async function (changedIssueId) {
 };
 
 /*
+ * Markdown live preview (Obsidian's behaviour, CodeMirror 5's primitives).
+ *
+ * The text stays text — this never rewrites the document, so the Yjs binding and the
+ * autosave see exactly what was typed. What changes is the *view*: syntax markers are
+ * collapsed on every line except the one the caret is on, and an image becomes an
+ * image. Click a line and its source comes back, which is the whole point: no mode to
+ * switch, no preview pane to compare against.
+ */
+function wrLivePreview(editor) {
+    const cm = editor.codemirror;
+    const MARKERS = [
+        /\*\*/g, /__/g, /~~/g, /`/g,                                   // emphasis and code fences
+        /^#{1,6}\s/g, /^>\s/g, /^[-*+]\s\[[ xX]\]\s/g,                  // heading, quote, task box
+        /\[(?=[^\]]*\]\()/g, /\]\([^)]*\)/g,                            // link syntax around its label
+    ];
+
+    let marks = [];
+    let pending = null;
+
+    function clear() {
+        for (const mark of marks) mark.clear();
+        marks = [];
+    }
+
+    function hideRange(line, from, to) {
+        if (to <= from) return;
+        marks.push(cm.markText({ line, ch: from }, { line, ch: to }, { className: 'cm-md-hidden' }));
+    }
+
+    function decorate() {
+        pending = null;
+        clear();
+
+        const active = cm.getCursor().line;
+        const viewport = cm.getViewport();
+
+        for (let ln = viewport.from; ln <= viewport.to; ln++) {
+            // The line being edited keeps its syntax: that is where you type it.
+            if (ln === active) continue;
+
+            const text = cm.getLine(ln);
+            if (!text) continue;
+
+            for (const pattern of MARKERS) {
+                pattern.lastIndex = 0;
+                let match;
+                while ((match = pattern.exec(text)) !== null) {
+                    hideRange(ln, match.index, match.index + match[0].length);
+                    if (match[0].length === 0) break;
+                }
+            }
+
+            // Images: only the ones this application serves (app/Support/Markdown/ImageGuardProcessor).
+            const image = /!\[([^\]]*)\]\(([^)\s]+)\)/.exec(text);
+            if (image && /(?:^|\/)uploads\/\d+(?:\/[^/]+)?$/.test(image[2])) {
+                const node = document.createElement('img');
+                node.src = image[2];
+                node.alt = image[1] || '';
+                node.className = 'cm-md-image';
+                node.loading = 'lazy';
+                const from = { line: ln, ch: image.index };
+                const to = { line: ln, ch: image.index + image[0].length };
+                marks.push(cm.markText(from, to, { replacedWith: node, clearOnEnter: false }));
+            }
+        }
+    }
+
+    function schedule() {
+        if (pending !== null) return;
+        pending = window.requestAnimationFrame(decorate);
+    }
+
+    cm.on('cursorActivity', schedule);
+    cm.on('change', schedule);
+    cm.on('viewportChange', schedule);
+    schedule();
+}
+
+/*
  * Builds a Markdown editor on every textarea[data-markdown] inside root.
  *
  * EasyMDE and Font Awesome are vendored under public/assets/vendor — no build
@@ -522,6 +601,9 @@ window.initMarkdownEditors = function (root) {
                 return seed;
             },
         });
+
+        // Live preview: styled tokens, markers only on the caret's line.
+        wrLivePreview(editor);
 
         // The textarea is hidden by EasyMDE; the field name lives on it, so the
         // panel keeps its own saving logic and Alpine's debounce does the throttling.
