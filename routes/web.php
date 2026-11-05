@@ -62,7 +62,12 @@ Route::middleware(RequireActor::class)->group(function () {
     // Images for Markdown: stored on this host, served through the app so a private
     // document's pictures stay private (docs/documents.md).
     Route::post('/uploads', [UploadController::class, 'store'])->name('uploads.store');
-    Route::get('/uploads/{attachment}', [UploadController::class, 'show'])->name('uploads.show');
+    // The trailing filename is cosmetic *for us* and essential for EasyMDE: it decides
+    // between "insert an image" and "insert a file link" by looking at the extension
+    // (app/.../layout: imageUploadFunction). Without it the editor inserts `[1](url)`.
+    Route::get('/uploads/{attachment}/{name?}', [UploadController::class, 'show'])
+        ->where('name', '[^/]+')
+        ->name('uploads.show');
 
     // The editor's preview pane, rendered by the same class that renders saved
     // comments (app/Support/Markdown.php).

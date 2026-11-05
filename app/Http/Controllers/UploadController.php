@@ -58,15 +58,20 @@ class UploadController extends Controller
             'size' => $file->getSize(),
         ]);
 
+        $url = route('uploads.show', [
+            'attachment' => $attachment->id,
+            'name' => Str::slug(pathinfo($attachment->original_name, PATHINFO_FILENAME)) ?: 'file',
+        ], absolute: false).'.'.Str::lower(pathinfo($attachment->original_name, PATHINFO_EXTENSION));
+
         return response()->json([
             'id' => $attachment->id,
-            'url' => route('uploads.show', $attachment, absolute: false),
+            'url' => $url,
             'name' => $attachment->original_name,
-            'markdown' => '![ '.$attachment->original_name.' ]('.route('uploads.show', $attachment, absolute: false).')',
+            'markdown' => '!['.$attachment->original_name.']('.$url.')',
         ], 201);
     }
 
-    public function show(Attachment $attachment): StreamedResponse
+    public function show(Attachment $attachment, ?string $name = null): StreamedResponse
     {
         $me = $this->actors->require();
 

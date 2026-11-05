@@ -56,6 +56,10 @@ class ImageUploadTest extends TestCase
         // itself registers routes at the root, which is what this test talks to.
         $this->assertStringStartsWith(config('workreport.base_path').'/uploads/', $json['url']);
         $this->assertStringNotContainsString('http', $json['url']);
+        // EasyMDE picks "image" over "file link" by the extension, so the URL has to
+        // end in one: /uploads/12/shot.png.
+        $this->assertStringEndsWith('.png', $json['url']);
+        $this->assertStringContainsString('](/', $json['markdown']);
 
         $attachment = Attachment::findOrFail($json['id']);
         Storage::disk('local')->assertExists($attachment->path);
@@ -105,6 +109,10 @@ class ImageUploadTest extends TestCase
 
         $prefixed = Markdown::toHtml('![도면](/report/uploads/12)');
         $this->assertStringContainsString('<img src="/report/uploads/12"', $prefixed);
+
+        // With the filename EasyMDE writes (the shape the editor actually produces).
+        $named = Markdown::toHtml('![도면](/report/uploads/12/설비도면.png)');
+        $this->assertStringContainsString('<img src="/report/uploads/12/', $named);
 
         // No image host, no tracking pixel: the requirement is that images live here.
         $foreign = Markdown::toHtml('![추적](/pixel.gif) ![밖](https://tracker.example/x.png)');

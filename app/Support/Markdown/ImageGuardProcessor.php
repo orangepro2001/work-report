@@ -21,13 +21,15 @@ use League\CommonMark\Node\Node;
 final class ImageGuardProcessor
 {
     /**
-     * `uploads/12` or `/report/uploads/12` — a path this application serves.
+     * `uploads/12`, `/report/uploads/12` or `/report/uploads/12/shot.png` — a path
+     * this application serves. The trailing filename is decoration; the id is what
+     * the controller resolves.
      *
      * Absolute URLs are refused even when they point back here: the uploader always
      * writes a relative path, and a rule that has to recognise "our own host" inside
      * rendered markdown would be one proxy header away from being wrong.
      */
-    private const LOCAL = '#^(?:[^/]+/)?uploads/\d+$#';
+    private const LOCAL = '#^(?:[^/]+/)?uploads/\d+(?:/[^/]+)?$#';
 
     public function __invoke(DocumentParsedEvent $event): void
     {
