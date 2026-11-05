@@ -1002,12 +1002,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tasks .grid td { padding-top: 6px; padding-bottom: 6px; }
 .tasks .key { color: var(--blue); }
 
-/* ── side-by-side Markdown editing ────────────────────────────────────────────
-   A document is written to be read: the preview sits next to the source and is
-   re-rendered by the server as you type (app/Http/Controllers/MarkdownPreviewController). */
-.wr-split + .editor-preview-side,
-.EasyMDEContainer .editor-preview-side { font-size: 13.5px; }
-.EasyMDEContainer.sided--no-fullscreen .CodeMirror { border-radius: 0 0 0 8px; }
-.EasyMDEContainer .editor-preview-side { border-radius: 0 0 8px 0; }
-.EasyMDEContainer .editor-preview-side .markdown,
-.EasyMDEContainer .editor-preview { line-height: 1.6; }
+/* ── document editor layout ───────────────────────────────────────────────────
+   Source | preview | rail. The preview is a server-rendered column (the same
+   renderer the saved document uses), not EasyMDE's absolutely-positioned
+   side-by-side, which collapsed inside this grid. */
+.doc-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 260px;
+    gap: 16px;
+    align-items: start;
+}
+.doc-preview { max-height: 72vh; overflow: auto; }
+.doc-preview article { min-height: 60px; }
+@media (max-width: 1180px) {
+    .doc-grid { grid-template-columns: minmax(0, 1fr); }
+    .doc-preview { max-height: none; }
+}

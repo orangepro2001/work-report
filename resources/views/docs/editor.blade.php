@@ -20,6 +20,8 @@
             'stateUrl' => route('docs.state', $document),
             'saveUrl' => route('docs.update', $document),
             'collabUrl' => route('docs.collab', $document),
+            'previewUrl' => route('markdown.preview'),
+            'labelEmpty' => __('ui.docs.no_body'),
             'labelSaved' => __('ui.docs.saved'),
             'labelConflict' => __('ui.docs.conflict'),
             'labelError' => __('ui.docs.save_failed'),
@@ -67,7 +69,7 @@
             <button class="btn btn--sm" type="button" x-on:click="reload()">{{ __('ui.docs.reload') }}</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start">
+        <div class="doc-grid">
             <div class="card" style="padding:14px">
                 @if ($read)
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -85,11 +87,21 @@
                            x-on:blur="save(true)">
                     <a class="btn btn--ghost btn--sm" style="float:right;margin-top:-38px"
                        href="{{ route('docs.show', $document) }}?read=1">{{ __('ui.docs.view') }}</a>
-                    <textarea class="textarea" id="doc-body" rows="24" data-markdown data-markdown-split data-field="body"
+                    <textarea class="textarea" id="doc-body" rows="24" data-markdown data-field="body"
                               data-document-id="{{ $document->id }}"
                               placeholder="{{ __('ui.docs.body_placeholder') }}">{{ $document->body }}</textarea>
                     <div class="tiny muted" style="margin-top:8px">{{ __('ui.docs.editor_hint') }}</div>
                 @endif
+            </div>
+
+            {{-- The preview is a pane of its own, rendered by the server. EasyMDE's
+                 built-in side-by-side positions itself absolutely and collapsed inside
+                 this layout; a real column is simpler and cannot be scrolled away. --}}
+            <div class="card doc-preview" style="padding:14px 16px">
+                <div class="tiny muted" style="margin-bottom:8px">{{ __('ui.docs.preview') }}</div>
+                <article id="doc-preview" class="markdown @if (! $document->body) is-empty @endif">
+                    {!! \App\Support\Markdown::toHtml($document->body) ?: '<p class="muted">'.e(__('ui.docs.no_body')).'</p>' !!}
+                </article>
             </div>
 
             <aside style="display:flex;flex-direction:column;gap:12px">
@@ -202,6 +214,7 @@ function documentEditor(id, spec) {
                 if (e.target.id !== 'doc-body') return;
                 this.dirty = true;
                 this.queueSave();
+                this.queuePreview();
             });
 
             this.startCollab();
@@ -287,6 +300,34 @@ function documentEditor(id, spec) {
         setBody(text) {
             const editor = this.editor();
             if (editor) { editor.value(text); } else { document.getElementById('doc-body').value = text; }
+        },
+
+        /** Keeps the right-hand pane showing what the saved document will look like. */
+        queuePreview() {
+            clearTimeout(this.previewTimer);
+            this.previewTimer = setTimeout(() => this.refreshPreview(), 300);
+        },
+
+        async refreshPreview() {
+            const pane = document.getElementById('doc-preview');
+            if (!pane) return;
+
+            try {
+                const res = await fetch(spec.previewUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ text: this.body() }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                pane.innerHTML = data.html || '<p class="muted">' + spec.labelEmpty + '</p>';
+            } catch (e) {
+                /* the pane keeps the previous rendering */
+            }
         },
 
         queueSave() {

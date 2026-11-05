@@ -441,13 +441,6 @@ window.initMarkdownEditors = function (root) {
             },
         });
 
-        // A document is written to be read: side-by-side puts the rendered result
-        // next to the source and keeps it there while typing.
-        if (el.dataset.markdownSplit !== undefined) {
-            editor.toggleSideBySide();
-            editor.codemirror.getWrapperElement()?.classList.add('wr-split');
-        }
-
         // The textarea is hidden by EasyMDE; the field name lives on it, so the
         // panel keeps its own saving logic and Alpine's debounce does the throttling.
         el._mde = editor;

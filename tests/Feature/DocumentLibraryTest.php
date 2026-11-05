@@ -158,10 +158,9 @@ class DocumentLibraryTest extends TestCase
 
         $html = (string) $this->get('/docs/'.$document->slug)->assertOk()->getContent();
 
-        // Without data-markdown the textarea would stay a plain textarea, and without
-        // data-markdown-split the live preview would not open beside it.
+        // Without data-markdown the textarea would stay a plain textarea: no toolbar,
+        // no preview, and the reader cannot tell the text will render.
         $this->assertStringContainsString('data-markdown', $html);
-        $this->assertStringContainsString('data-markdown-split', $html);
         $this->assertStringContainsString('easymde.min.js', $html);
         // The editor is built on page load, not only when the drawer opens.
         $this->assertStringContainsString('initMarkdownEditors(this.$el)', $html);
@@ -170,6 +169,14 @@ class DocumentLibraryTest extends TestCase
         // tells the person whether the text is stored.
         $this->assertStringContainsString('x-on:click="save(true)"', $html);
         $this->assertStringContainsString("saveState === 'saved'", $html);
+
+        // A preview column of its own, and translated labels — a missing lang key
+        // renders as "ui.docs.save_now" on the button, which is exactly what shipped
+        // once and must not ship again.
+        $this->assertStringContainsString('id="doc-preview"', $html);
+        $this->assertStringContainsString(__('ui.docs.save_now'), $html);
+        $this->assertStringNotContainsString('ui.docs.save_now', $html);
+        $this->assertStringContainsString(__('ui.docs.preview'), $html);
     }
 
     public function test_markdown_body_is_rendered_through_the_shared_renderer(): void
