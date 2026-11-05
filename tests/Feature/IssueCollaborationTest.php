@@ -177,22 +177,23 @@ class IssueCollaborationTest extends TestCase
      * A session that cannot identify anybody is dropped before signing in, so the
      * SSO is never handed a state from a previous, broken round trip.
      */
-    public function test_a_stale_session_is_cleared_before_signing_in(): void
+    public function test_a_stale_identity_is_dropped_but_an_in_flight_login_is_kept(): void
     {
+        // Unusable claims go away…
         $this->withSession([
-            'oidc.state' => 'from-an-old-round-trip',
-            'oidc.restarts' => 2,
-            'oidc.claims' => ['iss' => 'x', 'sub' => ''],   // present but unusable
+            'oidc.claims' => ['iss' => 'x', 'sub' => ''],
             'wr.actor_id' => 3,
-        ]);
+            'oidc.state' => 'a-round-trip-that-is-still-moving',
+        ])->get('/list?status=done')->assertRedirect(route('sso.redirect'));
 
-        $this->get('/list?status=done')->assertRedirect(route('sso.redirect'));
-
-        $this->assertNull(session('oidc.state'));
-        $this->assertNull(session('oidc.restarts'));
         $this->assertNull(session('oidc.claims'));
         $this->assertNull(session('wr.actor_id'));
-        // …except where the person was going.
+
+        // …but the state of a round trip in flight must survive, or another tab (or a
+        // reload) would invalidate the reply the browser is about to come back with.
+        $this->assertSame('a-round-trip-that-is-still-moving', session('oidc.state'));
+
+        // Where the person was going is remembered with its mount prefix.
         $this->assertSame(url('/list?status=done'), session('url.intended'));
     }
 

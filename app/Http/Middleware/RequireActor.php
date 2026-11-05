@@ -29,12 +29,12 @@ final class RequireActor
         $query = $request->getQueryString();
         $intended = url($request->path()).($query !== null && $query !== '' ? '?'.$query : '');
 
-        // A session that cannot identify anybody is baggage, not state: a stale
-        // `oidc.state` makes the SSO's reply fail the state check, and a half-held
-        // cookie makes it fail again. Drop all of it — new id, new CSRF token — and
-        // keep only where the person wanted to go.
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Drop identity that no longer resolves, but nothing else: invalidating the
+        // whole session here destroyed the `oidc.state` of a round trip that is
+        // still in flight (another tab, a reload, a prefetch), which made the SSO's
+        // reply fail the state check — the "cookie conflict" this fixed itself into.
+        // A session that has run out of retries is dealt with in the callback.
+        $request->session()->forget(['oidc.claims', 'wr.actor_id']);
         $request->session()->put('url.intended', $intended);
 
         return redirect()->route('sso.redirect');

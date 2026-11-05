@@ -155,6 +155,12 @@ function issuePanel(issueId) {
         statusLabel: @js($statusByKey[$issue->status_key]['label'] ?? $issue->status_key),
         commentCount: {{ $issue->comments->count() }},
 
+        /** True when the reply came from anywhere but this application's API. */
+        sessionLost(res) {
+            const type = res.headers.get('content-type') || '';
+            return res.redirected || res.status === 419 || res.status === 401 || !type.includes('application/json');
+        },
+
         async save(field, value) {
             const res = await fetch(`{{ url('issues') }}/${issueId}`, {
                 method: 'PATCH',
@@ -166,8 +172,18 @@ function issuePanel(issueId) {
                 body: JSON.stringify({ [field]: value === '' ? null : value }),
             });
 
+            // An expired session answers with a redirect into the SSO, which the
+            // browser follows into an HTML page that still returns 200. That made a
+            // failed save look like a success and the value stayed only in the DOM.
+            if (this.sessionLost(res)) {
+                document.body.innerHTML = '';
+                window.location.reload();
+                return;
+            }
+
             if (!res.ok) {
-                this.$dispatch('toast', { message: '저장하지 못했습니다' });
+                const problem = await res.json().catch(() => ({}));
+                this.$dispatch('toast', { message: problem.message || '저장하지 못했습니다' });
                 return;
             }
 
@@ -196,7 +212,15 @@ function issuePanel(issueId) {
                 body: JSON.stringify({ body }),
             });
 
-            if (!res.ok) return;
+            if (this.sessionLost(res)) {
+                window.location.reload();
+                return;
+            }
+
+            if (!res.ok) {
+                this.$dispatch('toast', { message: '댓글을 남기지 못했습니다' });
+                return;
+            }
 
             const data = await res.json();
             const holder = document.getElementById('comments');
