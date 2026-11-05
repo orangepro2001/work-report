@@ -61,6 +61,14 @@ socket with 4001.
 The service keeps nothing on disk: the text lives in Postgres through the autosave,
 so a restart costs at most the keystrokes of a document nobody has saved yet.
 
+### Saving
+
+Autosave fires 1.5 s after the last keystroke, on ⌘S/Ctrl+S, and on the toolbar's
+저장 button — a person who typed three words and closed the tab is not relying on a
+debounce they cannot see. The toolbar always says which state it is in
+(`저장됨 / 저장 안 됨 / 저장 중…`), a save in flight blocks a second one (the two
+would race on the revision check), and leaving with unsaved text asks first.
+
 ### Building the client
 
 `resources/js/collab.js` is the only source that needs a bundler (`yjs`,

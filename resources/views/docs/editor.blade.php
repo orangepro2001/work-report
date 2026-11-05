@@ -23,6 +23,9 @@
             'labelSaved' => __('ui.docs.saved'),
             'labelConflict' => __('ui.docs.conflict'),
             'labelError' => __('ui.docs.save_failed'),
+            'labelSaving' => __('ui.docs.saving'),
+            'labelPending' => __('ui.docs.pending'),
+            'labelSaved' => __('ui.docs.saved'),
             'readers' => $readers->map(fn ($m) => ['id' => $m->id, 'name' => $m->name, 'color' => $m->color])->values(),
         ];
     @endphp
@@ -34,7 +37,21 @@
             <span class="chip chip--{{ $document->isPrivate() ? 'amber' : 'blue' }}">
                 {{ $document->isPrivate() ? __('ui.docs.visibility_private') : __('ui.docs.visibility_team') }}
             </span>
+            <span class="chip" :class="{
+                      'chip--green': saveState === 'saved',
+                      'chip--amber': saveState === 'pending',
+                      'chip--blue': saveState === 'saving',
+                      'chip--red': saveState === 'error' }"
+                  x-text="saveState === 'saved' ? spec.labelSaved
+                        : (saveState === 'saving' ? spec.labelSaving
+                        : (saveState === 'error' ? spec.labelError : spec.labelPending))"></span>
             <span class="tiny muted" x-text="status" style="font-variant-numeric:tabular-nums"></span>
+            @if ($editable && ! $read)
+                <button class="btn btn--primary btn--sm" type="button" x-on:click="save(true)"
+                        :disabled="saving" title="⌘S / Ctrl+S">
+                    {{ __('ui.docs.save_now') }}
+                </button>
+            @endif
             <div style="flex:1"></div>
             <template x-for="reader in readers" :key="reader.id">
                 <span class="avatar avatar--sm" :style="'background: ' + reader.color" :title="reader.name" x-text="reader.name.slice(0, 1)"></span>
@@ -153,6 +170,9 @@ function documentEditor(id, spec) {
         editable: spec.editable,
         status: 'r' + spec.revision,
         dirty: false,
+        saving: false,
+        saveState: 'saved',      // saved | pending | saving | error
+        retried: false,
         readers: spec.readers,
         timer: null,
 
@@ -160,6 +180,23 @@ function documentEditor(id, spec) {
 
         init() {
             setInterval(() => this.poll(), 2500);
+
+            // Cmd/Ctrl+S is what a person reaches for; the debounce is not a promise
+            // that their text is stored.
+            window.addEventListener('keydown', (e) => {
+                if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 's') {
+                    e.preventDefault();
+                    this.save(true);
+                }
+            });
+
+            // Leaving with unsaved text should ask, not silently discard.
+            window.addEventListener('beforeunload', (e) => {
+                if (this.dirty) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
 
             document.addEventListener('mde-change', (e) => {
                 if (e.target.id !== 'doc-body') return;
@@ -254,12 +291,25 @@ function documentEditor(id, spec) {
 
         queueSave() {
             if (!this.editable) return;
+            this.saveState = this.saveState === 'saving' ? 'saving' : 'pending';
             clearTimeout(this.timer);
-            this.timer = setTimeout(() => this.save(false), 1200);
+            // One and a half seconds of quiet means the person paused, not that the
+            // text is disposable.
+            this.timer = setTimeout(() => this.save(false), 1500);
         },
 
         async save(explicit) {
             if (!this.editable) return;
+
+            // A save already in flight would race this one on the revision check.
+            if (this.saving) {
+                clearTimeout(this.timer);
+                this.timer = setTimeout(() => this.save(explicit), 400);
+                return;
+            }
+
+            this.saving = true;
+            this.saveState = 'saving';
 
             const res = await fetch(spec.saveUrl, {
                 method: 'PATCH',
@@ -276,9 +326,13 @@ function documentEditor(id, spec) {
 
                 // With the CRDT live, the text in this browser already contains the
                 // other person's keystrokes: adopt the newer revision and persist
-                // once more instead of asking the person to resolve anything.
-                if (this.collab) {
+                // once more instead of asking the person to resolve anything. Once —
+                // a busy document could otherwise bounce forever.
+                if (this.collab && !this.retried) {
+                    this.retried = true;
+                    this.saving = false;
                     this.revision = data.revision;
+
                     return this.save(explicit);
                 }
 
@@ -288,13 +342,19 @@ function documentEditor(id, spec) {
             }
 
             if (!res.ok) {
+                this.saving = false;
+                this.saveState = 'error';
                 this.status = spec.labelError;
+
                 return;
             }
 
             const data = await res.json();
             if (!data.unchanged) this.revision = data.revision;
+            this.saving = false;
+            this.retried = false;
             this.dirty = false;
+            this.saveState = 'saved';
             this.status = explicit ? spec.labelSaved + ' r' + this.revision : 'r' + this.revision;
             setTimeout(() => { if (this.status.startsWith(spec.labelSaved)) this.status = 'r' + this.revision; }, 1800);
         },

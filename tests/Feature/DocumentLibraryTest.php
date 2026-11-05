@@ -165,6 +165,11 @@ class DocumentLibraryTest extends TestCase
         $this->assertStringContainsString('easymde.min.js', $html);
         // The editor is built on page load, not only when the drawer opens.
         $this->assertStringContainsString('initMarkdownEditors(this.$el)', $html);
+
+        // Autosave is not the only way out: there is a button, and a state chip that
+        // tells the person whether the text is stored.
+        $this->assertStringContainsString('x-on:click="save(true)"', $html);
+        $this->assertStringContainsString("saveState === 'saved'", $html);
     }
 
     public function test_markdown_body_is_rendered_through_the_shared_renderer(): void
