@@ -2,9 +2,11 @@
 # Installed by deploy/scripts/install.sh into ~/.config/containers/systemd/.
 # Generates work-report.service; run it with `systemctl --user ...`.
 #
-# The service listens on all interfaces (0.0.0.0:3560) as required, so it is
-# reachable both directly on the tailnet and through `tailscale serve --set-path
-# /report http://127.0.0.1:3560`.
+# The service listens on all interfaces (0.0.0.0:3560) as required. It has its own
+# origin now (report.521985.xyz), so nothing is mounted under a path: requests arrive at
+# the root and WR_BASE_PATH stays empty. The tailnet door still uses
+# `tailscale serve --set-path /report`, which WR_BASE_PATH can be set to for that
+# deployment.
 
 [Unit]
 Description=work-report — 업무일보 (Jira-style report with Excel export)
@@ -20,7 +22,6 @@ Environment=WR_LISTEN=0.0.0.0:3560
 Environment=APP_ENV=production
 Environment=APP_DEBUG=false
 Environment=LOG_CHANNEL=stderr
-Environment=WR_BASE_PATH=/report
 Environment=WR_TZ=Asia/Seoul
 EnvironmentFile=%h/.config/work-report/env
 

@@ -16,7 +16,8 @@ if [ -n "$prev" ] && [ "$prev" = "$(podman image inspect "$WRP_IMAGE:$ver" --for
     if ! systemctl --user is-active -q "$WRP_NAME.service"; then
         render_quadlet
         render_backup_units
-        render_collab_units
+        render_check_units
+render_collab_units
         systemctl --user daemon-reload
         systemctl --user restart "$WRP_NAME-collab.service"
         systemctl --user start "$WRP_NAME.service"
@@ -29,6 +30,7 @@ fi
 podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 render_quadlet
 render_backup_units
+render_check_units
 render_collab_units
 systemctl --user daemon-reload
 systemctl --user restart "$WRP_NAME-collab.service"

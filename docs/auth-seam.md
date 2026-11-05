@@ -1,6 +1,6 @@
 # The identity seam — SSO (OIDC)
 
-Sign-in is the authorization center at **<https://521985.xyz/sso>** (a separate
+Sign-in is the authorization center at **<https://sso.521985.xyz>** (a separate
 Laravel OAuth 2.0 / OIDC issuer, see its own `DESIGN.md`). There is no password in
 this application: every page needs a session that carries OIDC claims, and the
 claims are the only thing the application ever knows about the person.
@@ -14,7 +14,7 @@ GET /report/board
 GET /report/auth/sso/redirect        → state (40 chars) into the session, then
       │                                302 to {issuer}/oauth/authorize
       ▼                               ?response_type=code&client_id=…
-GET https://521985.xyz/sso/login      the SSO authenticates the person
+GET https://sso.521985.xyz/login      the SSO authenticates the person
       │                                 (its own session, its own forms)
       ▼
 GET /report/auth/sso/callback?code=…&state=…
@@ -27,7 +27,7 @@ session['oidc.claims'] = {iss, sub, name, username}   → 302 to the intended UR
 
 Note the two bases: the **browser** is sent to the issuer, while the **server**
 calls the SSO over the loopback (`SSO_INTERNAL_BASE`). This host's public address
-is NATed without hairpin NAT, so `curl https://521985.xyz` fails *from the machine
+is NATed without hairpin NAT, so `curl https://sso.521985.xyz` fails *from the machine
 that serves it*; a container that used the issuer for its own calls timed out and
 the callback answered 500.
 
@@ -91,13 +91,14 @@ reopens the board is signed in silently.
 
 | Key | Meaning |
 |---|---|
-| `SSO_ISSUER` | issuer + base URL (`https://521985.xyz/sso`); endpoints are `{issuer}/oauth/authorize`, `/token`, `/userinfo` |
+| `SSO_ISSUER` | issuer + base URL (`https://sso.521985.xyz`); endpoints are `{issuer}/oauth/authorize`, `/token`, `/userinfo` |
 | `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` | the confidential client registered on the SSO |
-| `SSO_REDIRECT_URI` | leave **empty**: `url('/auth/sso/callback')` then answers with the hostname the request arrived on, which is what lets one deployment serve both `521985.xyz/report` and `egg.tail9f7f1f.ts.net/report` |
+| `SSO_REDIRECT_URI` | leave **empty**: `url('/auth/sso/callback')` then answers with the hostname the request arrived on, which is what lets the same deployment answer on `report.521985.xyz` and anywhere else it is registered |
 | `SSO_INTERNAL_BASE` | where the **server** reaches the SSO (`http://127.0.0.1:3550`). Split horizon: the browser uses `SSO_ISSUER`, the token exchange and `userinfo` use this. The public address is NATed without hairpin, so a container calling the issuer times out — that failure looked exactly like a 500 on the callback |
 
-Both entries are registered on the SSO as exact redirect URIs — the SSO never
-redirects to a wildcard. Adding a third hostname means registering it there first.
+Both entries are registered on the SSO as exact redirect URIs (`report.521985.xyz`
+today; the older `/report` and tailnet spellings are kept while links to them exist) —
+the SSO never redirects to a wildcard.
 
 ## Linking a member before the first sign-in
 
@@ -106,7 +107,7 @@ the board (the four seeded members carry the issue history). The link is the pai
 the SSO sends — `iss` is its issuer and `sub` is the numeric user id as a string:
 
 ```sql
-update members set oidc_issuer = 'https://521985.xyz/sso', oidc_subject = '4'
+update members set oidc_issuer = 'https://sso.521985.xyz', oidc_subject = '4'
  where key = 'chae-gilyong';   -- SSO username yzy
 ```
 

@@ -43,31 +43,37 @@ prefix, but nginx also rewrites `/report/...` for direct access (`location ~*
 ^/report/(assets/.+)$` plus Laravel's own `WR_BASE_PATH` routing). This is verified
 by requesting both forms.
 
-## Public entry point: 521985.xyz/report
+## Public entry points: one origin per application
 
-The tailnet URL is not the only door. The rootful Caddy on this host
-(`/etc/daily-work-web/Caddyfile`, container `daily-work-web-caddy`, public
-210.207.108.170 → NIC 172.22.0.29) terminates TLS for `521985.xyz` and exposes
-`/report` next to `/sso` and `/teach`:
+The rootful Caddy on this host (`/etc/daily-work-web/Caddyfile`, container
+`daily-work-web-caddy`, public 210.207.108.170 → NIC 172.22.0.29) terminates TLS and
+gives every application its own hostname:
 
-```caddy
-import prefix report 127.0.0.1:3560
-```
+| Origin | Backend | Notes |
+|---|---|---|
+| `report.521985.xyz` | `127.0.0.1:3560` (this app) | the board |
+| `sso.521985.xyz` | `127.0.0.1:3550` | the authorization center |
 
-`(prefix)` strips the prefix before forwarding — the same contract `tailscale serve
---set-path /report` uses, and the reason one build serves both doors: the app emits
-`/report/...` URLs (`WR_BASE_PATH=/report`) and never receives the prefix itself.
-A direct request to the container with the prefix left on (`127.0.0.1:3560/report/board`)
-is a 404, so any new proxy in front of it must strip too.
+Neither is mounted under a path, so `WR_BASE_PATH` is **empty**: the application builds
+root-relative URLs and no proxy has to strip or re-add a prefix. That is the whole
+reason for the split — the prefix-free form removes a class of "this link lost its
+`/report`" bugs that the mounted version produced.
+
+`521985.xyz/report*` and `521985.xyz/sso*` answer with **308** to the new origins, so
+bookmarks, quoted links and the `picture` URLs already stored on member rows keep
+working.
 
 Two things to know:
 
-- **The board is world-readable there.** There is no login (docs/auth-seam.md), so
-  anyone who guesses `/report` can read and edit it. That is a decision, not an
-  oversight; adding Basic auth to the vhost is a two-line change.
+- **The board is world-readable.** There is no anonymous access (every route needs an
+  SSO session), but there is no per-person authorization either: anyone the SSO lets in
+  sees everything.
 - The vhost is **not in this repository**, so nothing in CI can catch a regression.
-  The `nginx` vhost of the same name (`/etc/nginx/sites-available/egg-521985.xyz.conf`)
-  is dead: nginx is inactive and its `127.0.0.1:3000` upstream no longer exists.
+  Removing a site block leaves its application offline behind the catch-all
+  `respond "404 page not found" 404`. `deploy/scripts/check-public.sh` (timer
+  `work-report-public-check`, every five minutes) is what notices: it resolves both
+  names, then asks each origin for its health endpoint through the NIC address, because
+  this host cannot reach its own public address (no hairpin NAT).
 
 ## Database
 
@@ -190,7 +196,7 @@ schema change is applied before nginx starts taking traffic.
 Nobody reaches the board anonymously: every route except `healthz`, the three
 `auth/sso` routes and `auth/signed-out` requires OIDC claims (docs/auth-seam.md).
 Sign-in and the client registration both live on the SSO at
-<https://521985.xyz/sso>; the app keeps no users, passwords or tokens, only a
+<https://sso.521985.xyz>; the app keeps no users, passwords or tokens, only a
 `members` row per person with `oidc_issuer`/`oidc_subject` filled in on first
 sign-in.
 
@@ -198,8 +204,7 @@ sign-in.
 (`/sso/admin/clients`). Register **both** public hostnames as redirect URIs:
 
 ```
-https://521985.xyz/report/auth/sso/callback
-https://egg.tail9f7f1f.ts.net/report/auth/sso/callback
+https://report.521985.xyz/auth/sso/callback
 ```
 
 ## Container hardening

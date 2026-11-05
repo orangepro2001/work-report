@@ -1,0 +1,12 @@
+# systemd user unit that asks the public entry points whether they still work
+# (docs/deploy.md). The vhost lives outside this repository, so this is the only
+# thing that notices a missing site block.
+
+[Unit]
+Description=@NAME@ — public entry point check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@SCRIPT@

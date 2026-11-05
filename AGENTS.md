@@ -58,10 +58,13 @@ podman build --format docker -f deploy/Containerfile -t localhost/work-report:cu
 composer test        # 28 tests, needs a LOCAL PostgreSQL (see README)
 composer lint        # pint --test
 python3 tools/inspect_xlsx.py docs/source-rev02.xlsx > /tmp/dump.json
+deploy/scripts/check-public.sh   # both public origins, the way the timer does it
 ```
 
 Deploy: `bash deploy/scripts/upgrade.sh` (builds, health-checks, rolls back on
-failure). Production: <https://egg.tail9f7f1f.ts.net/report>. Two Quadlet units run
+failure). Production: <https://report.521985.xyz>; the authorization center it signs in
+against is <https://sso.521985.xyz>. Each has its own origin — no path mount, so
+`WR_BASE_PATH` stays empty and `/report`, `/sso` only exist as 308 redirects. Two Quadlet units run
 on that host: `work-report` (the app, 0.0.0.0:3560), `work-report-db` (PostgreSQL,
 127.0.0.1:5433) and `work-report-collab` (the Yjs sync service, 127.0.0.1:1234,
 proxied by the app's nginx at `/collab/`). The database's standby copy is one dump file mirrored

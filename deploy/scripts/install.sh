@@ -53,6 +53,7 @@ podman tag "$WRP_IMAGE:$ver" "$WRP_IMAGE:current"
 
 render_quadlet
 render_backup_units
+render_check_units
 render_collab_units
 systemctl --user daemon-reload
 systemctl --user start "$WRP_NAME-collab.service"
@@ -62,6 +63,8 @@ wait_healthy 120 || { journalctl --user -u "$WRP_NAME" -n 60 --no-pager; die "se
 # The mirror timer is part of the install: a database with no copy anywhere else
 # is one disk failure away from an empty board (docs/deploy.md).
 systemctl --user enable --now "$WRP_NAME-backup-offsite.timer"
+# The public check is what notices a reverse-proxy regression (docs/deploy.md).
+systemctl --user enable --now "$WRP_NAME-public-check.timer"
 
 log "installed $ver"
 log "offsite mirror: $WRP_NAME-backup-offsite.timer, first run 03:40; check with"

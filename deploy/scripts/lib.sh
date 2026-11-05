@@ -94,6 +94,18 @@ render_backup_units() {
         "$WRP_SRC/deploy/systemd/work-report-backup-offsite.timer" > "$dir/$WRP_NAME-backup-offsite.timer"
 }
 
+# render_check_units installs the public-entry-point timer: the only thing that notices
+# when the host's reverse proxy stops forwarding to this application.
+render_check_units() {
+    local dir=$HOME/.config/systemd/user
+    mkdir -p "$dir"
+    sed -e "s/@NAME@/$WRP_NAME/g" \
+        "$WRP_SRC/deploy/systemd/work-report-public-check.service" \
+        | sed -e "s|@SCRIPT@|$WRP_SRC/deploy/scripts/check-public.sh|" > "$dir/$WRP_NAME-public-check.service"
+    sed -e "s/@NAME@/$WRP_NAME/g" \
+        "$WRP_SRC/deploy/systemd/work-report-public-check.timer" > "$dir/$WRP_NAME-public-check.timer"
+}
+
 # The Yjs sync service (docs/documents.md) is part of the stack, not an extra the
 # operator has to remember: rendered with the instance name like everything else.
 render_collab_units() {

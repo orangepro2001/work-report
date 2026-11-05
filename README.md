@@ -125,7 +125,7 @@ blocks and the print setup.
 
 ## Identity and SSO
 
-Sign-in is the authorization center at <https://521985.xyz/sso>; there are no
+Sign-in is the authorization center at <https://sso.521985.xyz>; there are no
 passwords in this application. `App\Contracts\ActorResolver` is the single place
 that decides who is acting, and `OidcActorResolver` is its only implementation: a
 session carrying OIDC claims → a `members` row keyed by `oidc_issuer`+`oidc_subject`

@@ -8,8 +8,9 @@
  */
 
 return [
-    // Mount point of the app behind the reverse proxy ("" when served at the root).
-    'base_path' => env('WR_BASE_PATH', '/report'),
+    // Mount point of the app behind the reverse proxy — empty since it has its own
+    // origin (report.521985.xyz). Kept because running under a path is still supported.
+    'base_path' => env('WR_BASE_PATH', ''),
 
     'timezone' => env('WR_TZ', 'Asia/Seoul'),
 

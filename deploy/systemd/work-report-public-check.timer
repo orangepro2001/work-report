@@ -1,0 +1,13 @@
+# Every five minutes, per docs/deploy.md. A failing unit means an application is not
+# reachable from outside — systemctl --user --failed names it.
+
+[Unit]
+Description=@NAME@ — public entry point check (every 5 minutes)
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
