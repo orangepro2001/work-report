@@ -872,3 +872,57 @@ button, input, select, textarea { font: inherit; color: inherit; }
     .app { display: block; height: auto; }
     .sheet__paper { box-shadow: none; border: none; padding: 0; }
 }
+
+/* ── Markdown: rendered output and the EasyMDE editor ─────────────────────────
+   EasyMDE and Font Awesome are vendored (public/assets/vendor), so these rules
+   only have to make the editor look like it belongs to the board. */
+
+.markdown { line-height: 1.6; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p { margin: 0 0 8px; }
+.markdown ul, .markdown ol { margin: 0 0 8px; padding-left: 20px; }
+.markdown li { margin: 2px 0; }
+.markdown li input[type="checkbox"] { margin-right: 6px; }
+.markdown code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px; background: var(--blue-050); color: var(--navy);
+    padding: 1px 5px; border-radius: 4px;
+}
+.markdown pre {
+    background: var(--zebra); border: 1px solid var(--hair); border-radius: 8px;
+    padding: 10px 12px; overflow: auto;
+}
+.markdown pre code { background: none; color: inherit; padding: 0; }
+.markdown blockquote {
+    margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--hair-strong); color: var(--ink-2);
+}
+.markdown table { border-collapse: collapse; margin: 0 0 8px; font-size: 12.5px; }
+.markdown th, .markdown td { border: 1px solid var(--hair); padding: 4px 8px; text-align: left; }
+.markdown th { background: var(--zebra); }
+.markdown a { color: var(--blue); text-decoration: underline; }
+.markdown .mention {
+    color: var(--blue); background: var(--blue-050); border-radius: 4px; padding: 0 3px; font-weight: 600;
+}
+.markdown del { color: var(--muted); }
+
+.EasyMDEContainer .CodeMirror {
+    border: 1px solid var(--hair-strong); border-radius: 8px; background: var(--surface);
+    color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+}
+.EasyMDEContainer .CodeMirror-focused { border-color: var(--blue); }
+.EasyMDEContainer .editor-toolbar {
+    border: 1px solid var(--hair-strong); border-bottom: 0;
+    border-radius: 8px 8px 0 0; background: var(--zebra); opacity: 1;
+}
+.EasyMDEContainer .editor-toolbar button {
+    color: var(--ink-2); width: 28px; height: 26px; border-radius: 6px;
+}
+.EasyMDEContainer .editor-toolbar button:hover,
+.EasyMDEContainer .editor-toolbar button.active { background: var(--blue-050); color: var(--blue); border-color: transparent; }
+.EasyMDEContainer .editor-toolbar i.separator { border-left-color: var(--hair); border-right-color: transparent; }
+.EasyMDEContainer .editor-preview, .EasyMDEContainer .editor-preview-side {
+    background: var(--surface); color: var(--ink); padding: 10px 12px;
+}
+.EasyMDEContainer .editor-statusbar { color: var(--faint); font-size: 11px; }
+.EasyMDEContainer .editor-toolbar, .EasyMDEContainer .CodeMirror, .EasyMDEContainer .editor-preview { z-index: 1; }

@@ -4,7 +4,11 @@
     $isLate = $issue->isLateOn(now());
 @endphp
 
-<div x-data="issuePanel({{ $issue->id }})" data-issue="{{ $issue->id }}">
+<div x-data="issuePanel({{ $issue->id }}, {{ Js::from([
+    'percent' => $issue->percent,
+    'statusLabel' => $statusByKey[$issue->status_key]['label'] ?? $issue->status_key,
+    'commentCount' => $issue->comments->count(),
+]) }})" data-issue="{{ $issue->id }}">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
         <span class="key">{{ $issue->issue_key }}</span>
         <span class="chip chip--{{ $statusByKey[$issue->status_key]['tone'] ?? 'slate' }}" x-ref="statusChip"
@@ -99,8 +103,9 @@
 
     <div class="field" style="margin-top:16px">
         <label>{{ __('ui.issue.description') }}</label>
-        <textarea class="textarea" rows="4" placeholder="{{ __('ui.issue.description_placeholder') }}"
-                  x-on:blur="save('description', $el.value)">{{ $issue->description }}</textarea>
+        <textarea class="textarea" rows="4" data-markdown data-field="description"
+                  placeholder="{{ __('ui.issue.description_placeholder') }}"
+                  x-on:mde-change.debounce.900ms="save('description', $event.detail.value)">{{ $issue->description }}</textarea>
     </div>
 
     <hr style="border:none;border-top:1px solid var(--hair);margin:18px 0 12px">
@@ -120,7 +125,7 @@
     </div>
 
     <form x-on:submit.prevent="submitComment($el)" style="margin-top:10px">
-        <textarea class="textarea" name="body" rows="3" required
+        <textarea class="textarea" name="body" rows="3" required data-markdown data-field="comment"
                   placeholder="{{ __('ui.issue.comment_placeholder') }}"></textarea>
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
             <button class="btn btn--primary btn--sm" type="submit">{{ __('ui.issue.comment_submit') }}</button>
@@ -147,89 +152,3 @@
         </form>
     </details>
 </div>
-
-<script>
-function issuePanel(issueId) {
-    return {
-        percent: {{ $issue->percent }},
-        statusLabel: @js($statusByKey[$issue->status_key]['label'] ?? $issue->status_key),
-        commentCount: {{ $issue->comments->count() }},
-
-        /** True when the reply came from anywhere but this application's API. */
-        sessionLost(res) {
-            const type = res.headers.get('content-type') || '';
-            return res.redirected || res.status === 419 || res.status === 401 || !type.includes('application/json');
-        },
-
-        async save(field, value) {
-            const res = await fetch(`{{ url('issues') }}/${issueId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ [field]: value === '' ? null : value }),
-            });
-
-            // An expired session answers with a redirect into the SSO, which the
-            // browser follows into an HTML page that still returns 200. That made a
-            // failed save look like a success and the value stayed only in the DOM.
-            if (this.sessionLost(res)) {
-                document.body.innerHTML = '';
-                window.location.reload();
-                return;
-            }
-
-            if (!res.ok) {
-                const problem = await res.json().catch(() => ({}));
-                this.$dispatch('toast', { message: problem.message || '저장하지 못했습니다' });
-                return;
-            }
-
-            const data = await res.json();
-            if (data.activity) {
-                document.getElementById('timeline').innerHTML = data.activity;
-            }
-            if (field === 'status_key') {
-                const selected = document.querySelector('#p-status option:checked');
-                if (selected) this.statusLabel = selected.textContent;
-            }
-            this.$dispatch('toast', { message: '{{ __('ui.issue.saved') }}' });
-        },
-
-        async submitComment(form) {
-            const body = form.body.value.trim();
-            if (!body) return;
-
-            const res = await fetch(`{{ url('issues') }}/${issueId}/comments`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ body }),
-            });
-
-            if (this.sessionLost(res)) {
-                window.location.reload();
-                return;
-            }
-
-            if (!res.ok) {
-                this.$dispatch('toast', { message: '댓글을 남기지 못했습니다' });
-                return;
-            }
-
-            const data = await res.json();
-            const holder = document.getElementById('comments');
-            const empty = holder.querySelector('p.muted');
-            if (empty) empty.remove();
-            holder.insertAdjacentHTML('afterbegin', data.comment.html);
-            form.reset();
-            this.commentCount++;
-        },
-    };
-}
-</script>

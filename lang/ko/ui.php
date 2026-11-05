@@ -78,6 +78,8 @@ return [
         'activity' => '활동',
         'comment_placeholder' => '댓글을 남겨 주세요. @이름 으로 동료를 부를 수 있습니다.',
         'comment_submit' => '댓글 남기기',
+        'comment_added' => '댓글을 남겼습니다',
+        'editor_hint' => 'Markdown: **굵게**, `코드`, - 목록, | 표 |, @이름',
         'saved' => '저장했습니다',
         'deleted' => '보관함으로 옮겼습니다',
         'delete' => '보관',

@@ -67,6 +67,7 @@ Keyboard: `c` new issue · `/` search · `g b` board · `g l` list · `g d` dail
 app/
   Contracts/ActorResolver.php        ← the only seam for identity
   Services/OidcActorResolver.php     ← the implementation: SSO claims → member
+  Support/Markdown.php               ← the only Markdown renderer (league/commonmark)
   Services/IssueKeyGenerator.php     ← atomic per-project numbering (3D-01)
   Services/Excel/
     ReportSheetWriter.php            ← sheet 업무일보, every colour and formula
@@ -130,6 +131,16 @@ that decides who is acting, and `OidcActorResolver` is its only implementation: 
 session carrying OIDC claims → a `members` row keyed by `oidc_issuer`+`oidc_subject`
 (enrolled on first sign-in). Controllers, views, policies and the schema never see a
 token. See [docs/auth-seam.md](docs/auth-seam.md).
+
+## Markdown
+
+Descriptions and comments are stored as Markdown and rendered on the way out by
+`App\Support\Markdown` — `league/commonmark`, GitHub dialect, raw HTML escaped,
+`javascript:` links dropped, `@name` highlighted through a proper node renderer
+rather than a regex. The editor is EasyMDE, vendored under
+`public/assets/vendor/easymde` together with the Font Awesome solid icons it needs;
+its preview pane calls `POST /markdown`, so the preview is the saved output rather
+than a second, differently-behaved client-side parser.
 
 ## Docs
 

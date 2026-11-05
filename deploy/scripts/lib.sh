@@ -53,9 +53,17 @@ wait_healthy() { # [seconds]
 render_quadlet() {
     mkdir -p "$QUADLET_DIR"
     # The database unit is part of the stack: it must come up before the app.
+    # The tailnet address is published only when this host has one — the AI host's
+    # subscription needs it, but a machine without tailscale must still render.
+    local tailnet_ip publish_line=""
+    tailnet_ip=$(tailscale ip -4 2>/dev/null | head -1 || true)
+    if [ -n "$tailnet_ip" ]; then
+        publish_line="PublishPort=$tailnet_ip:$WRP_DB_PORT:5432"
+    fi
     sed -e "s/work-report-db/$WRP_NAME-db/g" \
         -e "s#%h/.config/work-report/db.env#%h/.config/$WRP_NAME/db.env#" \
         -e "s/127.0.0.1:5433/127.0.0.1:$WRP_DB_PORT/" \
+        -e "s|@DB_TAILNET_PUBLISH@|$publish_line|" \
         "$WRP_SRC/deploy/quadlet/work-report-db.container" > "$QUADLET_DIR/$WRP_NAME-db.container"
     sed -e "s/work-report-db-data/$WRP_NAME-db-data/g" \
         "$WRP_SRC/deploy/quadlet/work-report-db-data.volume" > "$QUADLET_DIR/$WRP_NAME-db-data.volume"

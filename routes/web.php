@@ -4,6 +4,7 @@ use App\Http\Controllers\BoardController;
 use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\IssueController;
+use App\Http\Controllers\MarkdownPreviewController;
 use App\Http\Controllers\SsoAuthController;
 use App\Http\Middleware\ForceMountPath;
 use App\Http\Middleware\RequireActor;
@@ -42,6 +43,10 @@ Route::middleware(RequireActor::class)->group(function () {
 
     // Excel export.
     Route::get('/export.xlsx', ExportController::class)->name('export');
+
+    // The editor's preview pane, rendered by the same class that renders saved
+    // comments (app/Support/Markdown.php).
+    Route::post('/markdown', MarkdownPreviewController::class)->name('markdown.preview');
 });
 
 // The authorization-code flow. These must stay reachable without a session that

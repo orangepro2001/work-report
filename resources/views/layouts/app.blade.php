@@ -6,8 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="light dark">
     <title>@yield('title', __('ui.app.name')) · {{ __('ui.app.name') }}</title>
+    <link rel="stylesheet" href="{{ wr_asset('assets/vendor/fontawesome/fontawesome.min.css') }}">
+    <link rel="stylesheet" href="{{ wr_asset('assets/vendor/fontawesome/solid.min.css') }}">
+    <link rel="stylesheet" href="{{ wr_asset('assets/vendor/easymde/easymde.min.css') }}?v={{ substr(md5_file(public_path('assets/vendor/easymde/easymde.min.css')), 0, 8) }}">
     <link rel="stylesheet" href="{{ wr_asset('assets/app.css') }}?v={{ substr(md5_file(public_path('assets/app.css')), 0, 8) }}">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f5597'/><text x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'>업</text></svg>">
+    <script src="{{ wr_asset('assets/vendor/easymde/easymde.min.js') }}?v={{ substr(md5_file(public_path('assets/vendor/easymde/easymde.min.js')), 0, 8) }}" defer></script>
     <script src="{{ wr_asset('assets/vendor/alpine.min.js') }}?v={{ substr(md5_file(public_path('assets/vendor/alpine.min.js')), 0, 8) }}" defer></script>
 </head>
 <body>
@@ -148,8 +152,15 @@ function app() {
                 this.drawer.html = await res.text();
                 const keyEl = document.querySelector('.drawer .key');
                 this.drawer.key = keyEl ? keyEl.textContent.trim() : '';
-                // The panel arrives as markup, so Alpine has to adopt the subtree.
-                this.$nextTick(() => window.Alpine && window.Alpine.initTree(this.$el.querySelector('.drawer__body')));
+                // The panel arrives as markup, so Alpine has to adopt the subtree,
+                // and the Markdown editors have to be built on the newly inserted
+                // textareas (scripts inside fetched HTML never run — which is why
+                // the panel's component lives in this file, not in the fragment).
+                this.$nextTick(() => {
+                    const body = this.$el.querySelector('.drawer__body');
+                    window.Alpine && window.Alpine.initTree(body);
+                    window.initMarkdownEditors(body);
+                });
             } catch (e) {
                 this.drawer.html = '<p class="muted">이슈를 열지 못했습니다.</p>';
             } finally {
@@ -163,7 +174,14 @@ function app() {
             this.drawer.html = '';
         },
 
-        openCreate() { this.create.open = true; this.$nextTick(() => { const f = this.$el.querySelector('#new-issue-summary'); if (f) f.focus(); }); },
+        openCreate() {
+            this.create.open = true;
+            this.$nextTick(() => {
+                const f = this.$el.querySelector('#new-issue-summary');
+                if (f) f.focus();
+                window.initMarkdownEditors(this.$el);
+            });
+        },
         closeCreate() { this.create.open = false; },
 
         toast(message) {
@@ -175,6 +193,154 @@ function app() {
         },
     };
 }
+
+/*
+ * The issue drawer's component.
+ *
+ * It is defined here, on the page, and not inside the fetched panel: markup
+ * inserted with x-html never executes the <script> it carries, so a factory
+ * defined there is undefined at Alpine's evaluation time and every x-on:change in
+ * the drawer silently does nothing.
+ */
+function issuePanel(issueId, initial) {
+    return {
+        percent: initial.percent,
+        statusLabel: initial.statusLabel,
+        commentCount: initial.commentCount,
+
+        /** True when the reply came from anywhere but this application's API. */
+        sessionLost(res) {
+            const type = res.headers.get('content-type') || '';
+            return res.redirected || res.status === 419 || res.status === 401 || !type.includes('application/json');
+        },
+
+        async save(field, value) {
+            const res = await fetch(`{{ url('issues') }}/${issueId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ [field]: value === '' ? null : value }),
+            });
+
+            if (this.sessionLost(res)) {
+                window.location.reload();
+                return;
+            }
+
+            if (!res.ok) {
+                const problem = await res.json().catch(() => ({}));
+                this.$dispatch('toast', { message: problem.message || '저장하지 못했습니다' });
+                return;
+            }
+
+            const data = await res.json();
+            if (data.activity) {
+                const timeline = document.getElementById('timeline');
+                if (timeline) timeline.innerHTML = data.activity;
+            }
+            if (field === 'status_key') {
+                const selected = document.querySelector('#p-status option:checked');
+                if (selected) this.statusLabel = selected.textContent;
+            }
+            this.$dispatch('toast', { message: '{{ __('ui.issue.saved') }}' });
+        },
+
+        async submitComment(form) {
+            const body = form.body.value.trim();
+            if (!body) return;
+
+            const res = await fetch(`{{ url('issues') }}/${issueId}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ body }),
+            });
+
+            if (this.sessionLost(res)) {
+                window.location.reload();
+                return;
+            }
+
+            if (!res.ok) {
+                this.$dispatch('toast', { message: '댓글을 남기지 못했습니다' });
+                return;
+            }
+
+            const data = await res.json();
+            const holder = document.getElementById('comments');
+            if (holder && data.comment) holder.insertAdjacentHTML('afterbegin', data.comment.html);
+
+            const editor = form.body._mde;
+            if (editor) { editor.value(''); } else { form.body.value = ''; }
+            this.commentCount += 1;
+            this.$dispatch('toast', { message: '{{ __('ui.issue.comment_added') }}' });
+        },
+    };
+}
+
+/*
+ * Builds a Markdown editor on every textarea[data-markdown] inside root.
+ *
+ * EasyMDE and Font Awesome are vendored under public/assets/vendor — no build
+ * step, no CDN and no network dependency (AGENTS.md). The preview is rendered by
+ * the server through POST /markdown, so what the editor shows is exactly what the
+ * saved comment will look like.
+ */
+window.initMarkdownEditors = function (root) {
+    if (!root || typeof window.EasyMDE !== 'function') return;
+
+    root.querySelectorAll('textarea[data-markdown]').forEach((el) => {
+        if (el.dataset.mdeReady === '1') return;
+        el.dataset.mdeReady = '1';
+
+        const editor = new window.EasyMDE({
+            element: el,
+            autoDownloadFontAwesome: false,
+            spellChecker: false,
+            status: false,
+            minHeight: '110px',
+            placeholder: el.getAttribute('placeholder') || '',
+            toolbar: ['bold', 'italic', 'strikethrough', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', 'code', 'table', '|', 'preview', 'side-by-side', 'guide'],
+            previewRender: (plainText) => {
+                // EasyMDE wants a string; the server's answer replaces the pane once
+                // it arrives, so the preview never renders anything unsanitised.
+                fetch('{{ route('markdown.preview') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ text: plainText }),
+                })
+                    .then((res) => (res.ok ? res.json() : { html: '' }))
+                    .then((data) => {
+                        const pane = el.closest('.EasyMDEContainer')?.querySelector('.editor-preview');
+                        if (pane) pane.innerHTML = data.html || '';
+                    })
+                    .catch(() => {});
+
+                return '<p class="muted">{{ __('ui.common.loading') }}</p>';
+            },
+        });
+
+        // The textarea is hidden by EasyMDE; the field name lives on it, so the
+        // panel keeps its own saving logic and Alpine's debounce does the throttling.
+        el._mde = editor;
+        el._syncMde = () => { el.value = editor.value(); };
+        editor.codemirror.on('change', () => {
+            el.value = editor.value();
+            el.dispatchEvent(new CustomEvent('mde-change', { detail: { value: el.value, field: el.dataset.field }, bubbles: true }));
+        });
+    });
+};
+
 </script>
 @stack('scripts')
 </body>

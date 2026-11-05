@@ -27,7 +27,9 @@ gets into it. Read these before touching anything:
 3. **Formulas stay formulas in the export.** `B`, `C`, `O` and the whole summary
    block are written as formula strings so Excel recalculates after an edit.
 4. **Do not add a build step.** No Vite, no Tailwind, no npm. The CSS is
-   hand-written in `public/assets/app.css`, Alpine is vendored. This is why the
+   hand-written in `public/assets/app.css`; Alpine, EasyMDE and the Font Awesome
+   solid icons are vendored under `public/assets/vendor/` (copy the dist file in,
+   never a CDN link — the board runs on a tailnet with no internet). This is why the
    image is small and the deploy is a copy.
 5. **Palette literals live in `ReportSheetWriter`.** If a colour is needed
    somewhere else, reference the constant, do not retype the hex.

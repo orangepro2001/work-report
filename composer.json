@@ -3,16 +3,24 @@
     "name": "orangepro2001/work-report",
     "type": "project",
     "description": "업무일보 — Jira-style collaborative work report with faithful Excel export (Laravel + PostgreSQL)",
-    "keywords": ["work-report", "jira", "kanban", "excel", "laravel", "postgresql"],
+    "keywords": [
+        "work-report",
+        "jira",
+        "kanban",
+        "excel",
+        "laravel",
+        "postgresql"
+    ],
     "license": "MIT",
     "require": {
-        "php": "^8.4",
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-pdo": "*",
         "ext-zip": "*",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
+        "league/commonmark": "^2.10",
+        "php": "^8.4",
         "phpoffice/phpspreadsheet": "^5.0"
     },
     "require-dev": {

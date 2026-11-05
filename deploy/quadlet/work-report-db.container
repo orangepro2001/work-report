@@ -1,9 +1,9 @@
 # Quadlet unit for the work-report PostgreSQL instance.
 #
 # The database lives on this host now (docs/deploy.md): the application and the
-# database share a machine, so queries go over the loopback and nothing depends on
-# the tailnet path. The previous instance on the AI host still holds a copy of the
-# data as a rollback point.
+# database share a machine, so queries go over the loopback. The tailnet is used for
+# one thing only — the AI host subscribes to this database for the standby copy.
+# The previous instance on the AI host still holds the pre-migration snapshot.
 #
 # Installed by deploy/scripts/install.sh into ~/.config/containers/systemd/.
 
@@ -15,9 +15,19 @@ After=network-online.target
 [Container]
 Image=docker.io/library/postgres:18-alpine
 ContainerName=work-report-db
-# Loopback only: the app container uses host networking, so 127.0.0.1 is enough and
-# the database is never reachable from the LAN or the tailnet directly.
+
+# wal_level=logical is not a dynamic setting: changing it restarts the unit. The app
+# is the only reader, so that restart costs a few seconds of 500s, not data.
+# max_slot_wal_keep_size caps the WAL an unreachable subscriber may pin at 1GB —
+# past that the slot is invalidated (the mirror then needs a resync) instead of the
+# publisher's disk filling up.
+Exec=postgres -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10 -c max_slot_wal_keep_size=1GB
+
+# Loopback for the app container (host networking) plus the tailnet address: the AI
+# host's subscription connects from there. Nothing is published on the LAN or public
+# interface.
 PublishPort=127.0.0.1:5433:5432
+@DB_TAILNET_PUBLISH@
 EnvironmentFile=%h/.config/work-report/db.env
 Volume=work-report-db-data.volume:/var/lib/postgresql:Z
 HealthCmd=["pg_isready","-U","work_report","-d","work_report"]

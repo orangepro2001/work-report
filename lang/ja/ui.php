@@ -72,6 +72,8 @@ return [
         'activity' => 'アクティビティ',
         'comment_placeholder' => 'コメントを残す。@名前 で同僚を呼べます。',
         'comment_submit' => 'コメントする',
+        'comment_added' => 'コメントを投稿しました',
+        'editor_hint' => 'Markdown: **太字**, `コード`, - リスト, | 表 |, @名前',
         'saved' => '保存しました',
         'deleted' => 'アーカイブしました',
         'delete' => 'アーカイブ',

@@ -73,6 +73,8 @@ return [
         'activity' => 'Activity',
         'comment_placeholder' => 'Leave a comment. Use @name to call someone in.',
         'comment_submit' => 'Comment',
+        'comment_added' => 'Comment posted',
+        'editor_hint' => 'Markdown: **bold**, `code`, - list, | table |, @name',
         'saved' => 'Saved',
         'deleted' => 'Moved to archive',
         'delete' => 'Archive',

@@ -115,7 +115,9 @@ class IssueCollaborationTest extends TestCase
         $issue = Issue::firstOrFail();
 
         $html = $this->postJson("/issues/{$issue->id}/comments", [
-            'body' => '<script>alert(1)</script> [x](javascript:alert(1)) `code`',
+            // Multi-line on purpose: a body that *starts* with an HTML block keeps the
+            // rest of that line verbatim (escaped), which is CommonMark's behaviour.
+            'body' => "**중요** <script>alert(1)</script>\n\n`code` [x](javascript:alert(1))",
         ])->assertCreated()->json('comment.html');
 
         $this->assertStringNotContainsString('<script>', $html);
