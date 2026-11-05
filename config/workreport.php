@@ -52,6 +52,16 @@ return [
         // The SSO's scope list is fixed (its config/sso.php): no `email` scope
         // exists, because an account has no address to release.
         'scope' => 'openid profile',
+
+        /*
+         * Issuers this deployment has been served from before. The subject is stable
+         * inside one provider, so when the issuer changes (a new origin) an existing
+         * member is matched by `sub` under an old issuer and re-linked — otherwise the
+         * first sign-in after such a move creates a duplicate person.
+         */
+        'legacy_issuers' => array_values(array_filter(
+            array_map('trim', explode(',', (string) env('SSO_LEGACY_ISSUERS', 'https://521985.xyz/sso'))),
+        )),
     ],
 
     // Report title prefix, mirrored in B2 of the workbook: "DMT_ 검사 기술 일일업무 보고".

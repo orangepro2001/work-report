@@ -225,6 +225,36 @@ class IssueCollaborationTest extends TestCase
      * timed out: the app must talk to the SSO over internal_base, not to the address
      * the browser uses (docs/auth-seam.md).
      */
+    /**
+     * Moving the authorization center to its own origin changed every `iss` claim. The
+     * subject did not change, so a member linked under the old issuer must be re-linked
+     * rather than duplicated — otherwise the first sign-in after a migration creates a
+     * second "person" with the same name.
+     */
+    public function test_a_member_linked_under_the_old_issuer_is_re_linked(): void
+    {
+        config(['workreport.sso.legacy_issuers' => ['https://sso.test']]);
+
+        $member = Member::where('key', 'jung-taehun')->firstOrFail();
+        $member->forceFill([
+            'oidc_issuer' => 'https://sso.test',
+            'oidc_subject' => '6',
+        ])->save();
+
+        $this->withSession(['oidc.claims' => [
+            'iss' => 'https://sso.test/sso',   // the new origin
+            'sub' => '6',
+            'name' => '정태훈 대리',
+            'username' => 'tony',
+        ]]);
+
+        $resolved = app(ActorResolver::class)->require();
+
+        $this->assertSame($member->id, $resolved->id);
+        $this->assertSame('https://sso.test/sso', $member->fresh()->oidc_issuer);
+        $this->assertSame(4, Member::count());
+    }
+
     public function test_the_callback_exchanges_the_code_and_adopts_the_member(): void
     {
         config([

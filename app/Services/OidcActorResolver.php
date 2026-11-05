@@ -31,6 +31,10 @@ final class OidcActorResolver implements ActorResolver
             ->first();
 
         if ($member === null) {
+            $member = $this->adoptFromLegacyIssuer($claims);
+        }
+
+        if ($member === null) {
             return $this->enrol($claims);
         }
 
@@ -49,6 +53,37 @@ final class OidcActorResolver implements ActorResolver
     {
         return $this->current()
             ?? throw new \RuntimeException('Nobody is signed in: the SSO session is missing its claims.');
+    }
+
+    /**
+     * The same person, linked under an issuer this deployment used to answer on.
+     *
+     * Moving the authorization center to its own origin changed every `iss` claim; the
+     * `sub` did not change. Without this, the first sign-in after such a move would
+     * create a second member for somebody who already exists.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function adoptFromLegacyIssuer(array $claims): ?Member
+    {
+        $legacy = array_diff((array) config('workreport.sso.legacy_issuers', []), [$claims['iss']]);
+
+        if ($legacy === []) {
+            return null;
+        }
+
+        $member = Member::query()
+            ->whereIn('oidc_issuer', $legacy)
+            ->where('oidc_subject', $claims['sub'])
+            ->first();
+
+        if ($member === null) {
+            return null;
+        }
+
+        $member->forceFill(['oidc_issuer' => $claims['iss']])->save();
+
+        return $member;
     }
 
     /**
