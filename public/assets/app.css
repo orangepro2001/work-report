@@ -1018,3 +1018,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
     .doc-grid { grid-template-columns: minmax(0, 1fr); }
     .doc-preview { max-height: none; }
 }
+
+/* Read mode: one wide column, no preview pane. */
+.doc-grid--read { grid-template-columns: minmax(0, 1fr) 260px; }
+.doc-grid--read .card { max-width: 980px; }
+.doc-read__title { font-size: 20px; font-weight: 700; margin: 2px 0 14px; letter-spacing: -.01em; }
+@media (max-width: 1180px) { .doc-grid--read { grid-template-columns: minmax(0, 1fr); } }

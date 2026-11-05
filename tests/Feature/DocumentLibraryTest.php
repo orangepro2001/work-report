@@ -179,6 +179,29 @@ class DocumentLibraryTest extends TestCase
         $this->assertStringContainsString(__('ui.docs.preview'), $html);
     }
 
+    public function test_the_editor_and_the_finished_document_toggle(): void
+    {
+        $document = $this->document(['body' => '**굵게**']);
+
+        // Editing: a button to leave the editor, and the save controls.
+        $edit = (string) $this->get('/docs/'.$document->slug)->assertOk()->getContent();
+        $this->assertStringContainsString('?read=1', $edit);
+        $this->assertStringContainsString(__('ui.docs.view'), $edit);
+        $this->assertStringContainsString('x-on:click="save(true)"', $edit);
+
+        // Read mode: the rendered document only — no save button, no preview column,
+        // and a way back into the editor.
+        $read = (string) $this->get('/docs/'.$document->slug.'?read=1')->assertOk()->getContent();
+        $this->assertStringContainsString('<strong>굵게</strong>', $read);
+        $this->assertStringContainsString(__('ui.docs.edit'), $read);
+        // '저장' alone would match unrelated labels, so the save control itself is the test.
+        $this->assertStringNotContainsString('x-on:click="save(true)"', $read);
+        $this->assertStringNotContainsString('id="doc-preview"', $read);
+        // No editor surface at all (the layout's JS mentions the selector, so the
+        // textarea itself is what to look for).
+        $this->assertStringNotContainsString('id="doc-body"', $read);
+    }
+
     public function test_markdown_body_is_rendered_through_the_shared_renderer(): void
     {
         $document = $this->document([

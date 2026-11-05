@@ -54,6 +54,22 @@
                     {{ __('ui.docs.save_now') }}
                 </button>
             @endif
+
+            {{-- Leaving the editor for the finished document, and back again. The
+                 reader sees nothing but the rendered page; the author keeps the
+                 history and sharing rail either way. --}}
+            @if ($read)
+                @if ($editable)
+                    <a class="btn btn--sm" href="{{ route('docs.show', $document) }}">
+                        <span aria-hidden="true">✎</span> {{ __('ui.docs.edit') }}
+                    </a>
+                @endif
+            @else
+                <a class="btn btn--sm" href="{{ route('docs.show', $document) }}?read=1">
+                    <span aria-hidden="true">👁</span> {{ __('ui.docs.view') }}
+                </a>
+            @endif
+
             <div style="flex:1"></div>
             <template x-for="reader in readers" :key="reader.id">
                 <span class="avatar avatar--sm" :style="'background: ' + reader.color" :title="reader.name" x-text="reader.name.slice(0, 1)"></span>
@@ -69,24 +85,15 @@
             <button class="btn btn--sm" type="button" x-on:click="reload()">{{ __('ui.docs.reload') }}</button>
         </div>
 
-        <div class="doc-grid">
+        <div class="doc-grid {{ $read ? 'doc-grid--read' : '' }}">
             <div class="card" style="padding:14px">
                 @if ($read)
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                        <h1 class="h2" style="margin:0">{{ $document->title }}</h1>
-                        @if ($editable)
-                            <a class="btn btn--ghost btn--sm" style="margin-left:auto" href="{{ route('docs.show', $document) }}">
-                                {{ __('ui.docs.edit') }}
-                            </a>
-                        @endif
-                    </div>
+                    <h1 class="doc-read__title">{{ $document->title }}</h1>
                     <article class="markdown" id="doc-read">{!! \App\Support\Markdown::toHtml($document->body) ?: '<p class="muted">'.e(__('ui.docs.no_body')).'</p>' !!}</article>
                 @else
                     <input class="input" id="doc-title" value="{{ $document->title }}" maxlength="160"
                            style="font-size:16px;font-weight:700;margin-bottom:10px"
                            x-on:blur="save(true)">
-                    <a class="btn btn--ghost btn--sm" style="float:right;margin-top:-38px"
-                       href="{{ route('docs.show', $document) }}?read=1">{{ __('ui.docs.view') }}</a>
                     <textarea class="textarea" id="doc-body" rows="24" data-markdown data-field="body"
                               data-document-id="{{ $document->id }}"
                               placeholder="{{ __('ui.docs.body_placeholder') }}">{{ $document->body }}</textarea>
@@ -94,15 +101,17 @@
                 @endif
             </div>
 
-            {{-- The preview is a pane of its own, rendered by the server. EasyMDE's
-                 built-in side-by-side positions itself absolutely and collapsed inside
-                 this layout; a real column is simpler and cannot be scrolled away. --}}
-            <div class="card doc-preview" style="padding:14px 16px">
-                <div class="tiny muted" style="margin-bottom:8px">{{ __('ui.docs.preview') }}</div>
-                <article id="doc-preview" class="markdown @if (! $document->body) is-empty @endif">
-                    {!! \App\Support\Markdown::toHtml($document->body) ?: '<p class="muted">'.e(__('ui.docs.no_body')).'</p>' !!}
-                </article>
-            </div>
+            @unless ($read)
+                {{-- The preview is a pane of its own, rendered by the server. EasyMDE's
+                     built-in side-by-side positions itself absolutely and collapsed inside
+                     this layout; a real column is simpler and cannot be scrolled away. --}}
+                <div class="card doc-preview" style="padding:14px 16px">
+                    <div class="tiny muted" style="margin-bottom:8px">{{ __('ui.docs.preview') }}</div>
+                    <article id="doc-preview" class="markdown @if (! $document->body) is-empty @endif">
+                        {!! \App\Support\Markdown::toHtml($document->body) ?: '<p class="muted">'.e(__('ui.docs.no_body')).'</p>' !!}
+                    </article>
+                </div>
+            @endunless
 
             <aside style="display:flex;flex-direction:column;gap:12px">
                 <div class="card" style="padding:12px">
